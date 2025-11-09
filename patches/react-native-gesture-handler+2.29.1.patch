@@ -1,0 +1,20 @@
+diff --git a/node_modules/react-native-gesture-handler/android/src/main/java/com/facebook/react/uimanager/ViewManagerWithGeneratedInterface.java b/node_modules/react-native-gesture-handler/android/src/main/java/com/facebook/react/uimanager/ViewManagerWithGeneratedInterface.java
+new file mode 100644
+index 0000000..654fa2a
+--- /dev/null
++++ b/node_modules/react-native-gesture-handler/android/src/main/java/com/facebook/react/uimanager/ViewManagerWithGeneratedInterface.java
+@@ -0,0 +1,4 @@
++package com.facebook.react.uimanager;
++
++public interface ViewManagerWithGeneratedInterface<T> {
++}
+diff --git a/node_modules/react-native-gesture-handler/android/src/main/java/com/facebook/react/viewmanagers/ViewManagerWithGeneratedInterface.java b/node_modules/react-native-gesture-handler/android/src/main/java/com/facebook/react/viewmanagers/ViewManagerWithGeneratedInterface.java
+new file mode 100644
+index 0000000..344b65d
+--- /dev/null
++++ b/node_modules/react-native-gesture-handler/android/src/main/java/com/facebook/react/viewmanagers/ViewManagerWithGeneratedInterface.java
+@@ -0,0 +1,4 @@
++package com.facebook.react.viewmanagers;
++
++public interface ViewManagerWithGeneratedInterface<T> {
++}

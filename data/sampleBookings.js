@@ -1,0 +1,58 @@
+export const bookingDetailsData = [
+  {
+    id: 'CBID721514',
+    service: 'Companionship',
+    userName: 'SNAH',
+    address: 'Parking Structure 4, 221 Westwood Plaza, Los Angeles, CA 90095, USA',
+    careNeeded: ['Companionship', 'Cooking/Meal Preparation'],
+    mobility: 'Walker',
+    startDate: 'Jan 24, 2024',
+    endDate: 'Jan 24, 2024',
+    startTime: '11:50 AM',
+    endTime: '12:50 PM',
+    charges: 13.15,
+    totalFee: 72.0,
+    earning: 58.85,
+    distance: '7.42 miles away',
+    mapImage: 'https://maps.gstatic.com/tactile/pane/default_ds.png',
+  },
+  {
+    id: 'CBID731880',
+    service: 'Medication Reminder',
+    userName: 'Jordan Miles',
+    address: '1120 Pacific Coast Hwy, Hermosa Beach, CA 90254, USA',
+    careNeeded: ['Medication', 'Safety Check'],
+    mobility: 'Cane',
+    startDate: 'Jan 24, 2024',
+    endDate: 'Jan 24, 2024',
+    startTime: '10:30 AM',
+    endTime: '11:30 AM',
+    charges: 12.5,
+    totalFee: 64.0,
+    earning: 45.4,
+    distance: '5.12 miles away',
+    mapImage: 'https://maps.gstatic.com/tactile/pane/default_ds.png',
+  },
+  {
+    id: 'CBID745402',
+    service: 'Personal Care',
+    userName: 'Anderson Family',
+    address: '3400 Ocean Park Blvd, Santa Monica, CA 90405, USA',
+    careNeeded: ['Bathing', 'Meal Prep', 'Safety Check', 'Light Housekeeping'],
+    mobility: 'Wheelchair',
+    startDate: 'Jan 23, 2024',
+    endDate: 'Jan 23, 2024',
+    startTime: '9:00 PM',
+    endTime: '10:00 PM',
+    charges: 15.0,
+    totalFee: 80.0,
+    earning: 64.25,
+    distance: '10.9 miles away',
+    mapImage: 'https://maps.gstatic.com/tactile/pane/default_ds.png',
+  },
+];
+
+export const getBookingById = (id) =>
+  bookingDetailsData.find((booking) => booking.id === id) || bookingDetailsData[0];
+
+
