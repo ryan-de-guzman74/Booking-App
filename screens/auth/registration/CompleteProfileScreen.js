@@ -12,10 +12,11 @@ import {
   FlatList,
   Platform,
   SafeAreaView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useDispatch, useSelector } from 'react-redux';
-import { setPersonalInfo } from '../../../store/slices/profileSlice';
+import { setPersonalInfo, setProfileCompleted, setProfilePictureTaken } from '../../../store/slices/profileSlice';
 import DatePickerModal from '../../../components/DatePickerModal';
 import CityAutocompleteModal from '../../../components/CityAutocompleteModal';
 import LanguagePickerModal from '../../../components/LanguagePickerModal';
@@ -51,7 +52,8 @@ export default function CompleteProfileScreen({ route, navigation }) {
   const { phoneNumber = '', countryCode = '', mPin = '', source } = route.params ?? {};
   const dispatch = useDispatch();
   const storedInfo = useSelector((state) => state.profile.personalInfo);
-  
+  const profilePictureTaken = useSelector((state) => state.profile.profilePictureTaken);
+
   const [fullName, setFullName] = useState(storedInfo.fullName || '');
   const [email, setEmail] = useState(storedInfo.email || '');
   const [dateOfBirth, setDateOfBirth] = useState(
@@ -69,7 +71,7 @@ export default function CompleteProfileScreen({ route, navigation }) {
   const [cellPhone, setCellPhone] = useState(storedInfo.phoneNumber || phoneNumber || '');
   const [ssn, setSsn] = useState(storedInfo.ssn || '');
   const [spokenLanguages, setSpokenLanguages] = useState(storedInfo.spokenLanguages || []);
-  
+
   const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showCityPicker, setShowCityPicker] = useState(false);
@@ -139,7 +141,7 @@ export default function CompleteProfileScreen({ route, navigation }) {
       alert('Please fill in all required fields');
       return;
     }
-    
+
     dispatch(
       setPersonalInfo({
         fullName,
@@ -158,10 +160,19 @@ export default function CompleteProfileScreen({ route, navigation }) {
       }),
     );
 
+    dispatch(setProfileCompleted(true));
+
     if (source === 'profile') {
+      // If editing from profile and picture already taken, go to PersonalDetails
+      if (profilePictureTaken) {
       navigation.navigate('PersonalDetails');
+      } else {
+        // First time editing, go to ProfilePictureTaken
+        navigation.navigate('ProfilePictureTaken');
+      }
     } else {
-      navigation.navigate('LocationPermission', route.params ?? {});
+      // Registration flow - navigate to ProfilePictureTaken (first time only)
+      navigation.navigate('ProfilePictureTaken');
     }
   };
 
@@ -192,227 +203,232 @@ export default function CompleteProfileScreen({ route, navigation }) {
         </View>
       </SafeAreaView>
 
-      <View style={styles.contentWrapper}>
+      <KeyboardAvoidingView
+        style={styles.contentWrapper}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         {/* Form Content */}
         <View style={styles.contentCard}>
-          <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Full Name */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Full name</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'fullName' && styles.inputFocused]}
-            placeholder="Enter your full name"
-            placeholderTextColor={colors.textMuted}
-            value={fullName}
-            onChangeText={setFullName}
-            onFocus={() => setFocusedField('fullName')}
-            onBlur={() => setFocusedField(null)}
-          />
-        </View>
-
-        {/* Email */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'email' && styles.inputFocused]}
-            placeholder="Enter your email"
-            placeholderTextColor={colors.textMuted}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            onFocus={() => setFocusedField('email')}
-            onBlur={() => setFocusedField(null)}
-          />
-        </View>
-
-        {/* Date of Birth */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Date of Birth*</Text>
-          <TouchableOpacity 
-            style={[styles.input, styles.selectInput]}
-            onPress={() => setShowDatePicker(true)}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={dateOfBirthFormatted ? styles.inputText : styles.placeholderText}>
-              {dateOfBirthFormatted || 'Select date'}
-            </Text>
-            <Ionicons name="calendar-outline" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Gender */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Gender*</Text>
-          <TouchableOpacity 
-            style={[styles.input, styles.selectInput]}
-            onPress={() => setShowGenderPicker(true)}
-          >
-            <Text style={gender ? styles.inputText : styles.placeholderText}>
-              {gender || 'Choose Gender'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Street */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Street</Text>
-          <View style={styles.inputWithButton}>
-            <TextInput
-              style={[styles.inputFlex, focusedField === 'street' && styles.inputFocused]}
-              placeholder="Enter your street address"
-              placeholderTextColor={colors.textMuted}
-              value={street}
-              onChangeText={setStreet}
-              onFocus={() => setFocusedField('street')}
-              onBlur={() => setFocusedField(null)}
-            />
-            <TouchableOpacity 
-              style={styles.searchButton}
-              onPress={() => setShowCityPicker(true)}
-            >
-              <Ionicons name="search" size={20} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* City */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>City*</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'city' && styles.inputFocused]}
-            placeholder="Enter your city name"
-            placeholderTextColor={colors.textMuted}
-            value={city}
-            onChangeText={setCity}
-            onFocus={() => setFocusedField('city')}
-            onBlur={() => setFocusedField(null)}
-          />
-        </View>
-
-        {/* State */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>State*</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'state' && styles.inputFocused]}
-            placeholder="Enter your state name"
-            placeholderTextColor={colors.textMuted}
-            value={state}
-            onChangeText={setState}
-            onFocus={() => setFocusedField('state')}
-            onBlur={() => setFocusedField(null)}
-          />
-        </View>
-
-        {/* Zip Code */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Zip Code*</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'zipCode' && styles.inputFocused]}
-            placeholder="Enter your zipcode"
-            placeholderTextColor={colors.textMuted}
-            value={zipCode}
-            onChangeText={setZipCode}
-            keyboardType="number-pad"
-            onFocus={() => setFocusedField('zipCode')}
-            onBlur={() => setFocusedField(null)}
-          />
-        </View>
-
-        {/* Country */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Country*</Text>
-          <TouchableOpacity
-            style={[styles.input, styles.selectInput]}
-            onPress={() => setShowCountryPicker(true)}
-            activeOpacity={0.8}
-          >
-            <Text style={country ? styles.inputText : styles.placeholderText}>
-              {country || 'Select Country'}
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Cell Phone Number */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Cell Phone Number*</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'cellPhone' && styles.inputFocused]}
-            placeholder="Enter your cell phone number"
-            placeholderTextColor={colors.textMuted}
-            value={cellPhone}
-            onChangeText={setCellPhone}
-            keyboardType="phone-pad"
-            onFocus={() => setFocusedField('cellPhone')}
-            onBlur={() => setFocusedField(null)}
-          />
-        </View>
-
-        {/* Social Security Number */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Social Security Number (SSN)*</Text>
-          <TextInput
-            style={[styles.input, focusedField === 'ssn' && styles.inputFocused]}
-            placeholder="Enter your SSN"
-            placeholderTextColor={colors.textMuted}
-            value={ssn}
-            onChangeText={setSsn}
-            keyboardType="number-pad"
-            secureTextEntry
-            maxLength={9}
-            onFocus={() => setFocusedField('ssn')}
-            onBlur={() => setFocusedField(null)}
-          />
-        </View>
-
-        {/* Spoken Language */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Spoken Language*</Text>
-          <TouchableOpacity 
-            style={[styles.input, styles.selectInput]}
-            onPress={() => setShowLanguagePicker(true)}
-          >
-            <Text style={styles.placeholderText}>
-              Select Language
-            </Text>
-            <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
-          
-          {/* Selected Languages Tags */}
-          {spokenLanguages.length > 0 && (
-            <View style={styles.languageTagsContainer}>
-              {spokenLanguages.map((language, index) => (
-                <View key={index} style={styles.languageTag}>
-                  <Text style={styles.languageTagText}>{language}</Text>
-                  <TouchableOpacity 
-                    onPress={() => handleRemoveLanguage(language)}
-                    style={styles.removeLanguageButton}
-                  >
-                    <Ionicons name="close" size={16} color={colors.textDark} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+            {/* Full Name */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Full name</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'fullName' && styles.inputFocused]}
+                placeholder="Enter your full name"
+                placeholderTextColor={colors.textMuted}
+                value={fullName}
+                onChangeText={setFullName}
+                onFocus={() => setFocusedField('fullName')}
+                onBlur={() => setFocusedField(null)}
+              />
             </View>
-          )}
-        </View>
-      </ScrollView>
+
+            {/* Email */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'email' && styles.inputFocused]}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.textMuted}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            {/* Date of Birth */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Date of Birth*</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.selectInput]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={dateOfBirthFormatted ? styles.inputText : styles.placeholderText}>
+                  {dateOfBirthFormatted || 'Select date'}
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Gender */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Gender*</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.selectInput]}
+                onPress={() => setShowGenderPicker(true)}
+              >
+                <Text style={gender ? styles.inputText : styles.placeholderText}>
+                  {gender || 'Choose Gender'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Street */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Street</Text>
+              <View style={styles.inputWithButton}>
+                <TextInput
+                  style={[styles.inputFlex, focusedField === 'street' && styles.inputFocused]}
+                  placeholder="Enter your street address"
+                  placeholderTextColor={colors.textMuted}
+                  value={street}
+                  onChangeText={setStreet}
+                  onFocus={() => setFocusedField('street')}
+                  onBlur={() => setFocusedField(null)}
+                />
+                <TouchableOpacity
+                  style={styles.searchButton}
+                  onPress={() => setShowCityPicker(true)}
+                >
+                  <Ionicons name="search" size={20} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* City */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>City*</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'city' && styles.inputFocused]}
+                placeholder="Enter your city name"
+                placeholderTextColor={colors.textMuted}
+                value={city}
+                onChangeText={setCity}
+                onFocus={() => setFocusedField('city')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            {/* State */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>State*</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'state' && styles.inputFocused]}
+                placeholder="Enter your state name"
+                placeholderTextColor={colors.textMuted}
+                value={state}
+                onChangeText={setState}
+                onFocus={() => setFocusedField('state')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            {/* Zip Code */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Zip Code*</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'zipCode' && styles.inputFocused]}
+                placeholder="Enter your zipcode"
+                placeholderTextColor={colors.textMuted}
+                value={zipCode}
+                onChangeText={setZipCode}
+                keyboardType="number-pad"
+                onFocus={() => setFocusedField('zipCode')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            {/* Country */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Country*</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.selectInput]}
+                onPress={() => setShowCountryPicker(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={country ? styles.inputText : styles.placeholderText}>
+                  {country || 'Select Country'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Cell Phone Number */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Cell Phone Number*</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'cellPhone' && styles.inputFocused]}
+                placeholder="Enter your cell phone number"
+                placeholderTextColor={colors.textMuted}
+                value={cellPhone}
+                onChangeText={setCellPhone}
+                keyboardType="phone-pad"
+                onFocus={() => setFocusedField('cellPhone')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            {/* Social Security Number */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Social Security Number (SSN)*</Text>
+              <TextInput
+                style={[styles.input, focusedField === 'ssn' && styles.inputFocused]}
+                placeholder="Enter your SSN"
+                placeholderTextColor={colors.textMuted}
+                value={ssn}
+                onChangeText={setSsn}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={9}
+                onFocus={() => setFocusedField('ssn')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            {/* Spoken Language */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Spoken Language*</Text>
+              <TouchableOpacity
+                style={[styles.input, styles.selectInput]}
+                onPress={() => setShowLanguagePicker(true)}
+              >
+                <Text style={styles.placeholderText}>
+                  Select Language
+                </Text>
+                <Ionicons name="chevron-down" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+
+              {/* Selected Languages Tags */}
+              {spokenLanguages.length > 0 && (
+                <View style={styles.languageTagsContainer}>
+                  {spokenLanguages.map((language, index) => (
+                    <View key={index} style={styles.languageTag}>
+                      <Text style={styles.languageTagText}>{language}</Text>
+                      <TouchableOpacity
+                        onPress={() => handleRemoveLanguage(language)}
+                        style={styles.removeLanguageButton}
+                      >
+                        <Ionicons name="close" size={16} color={colors.textDark} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          </ScrollView>
         </View>
 
-      {/* Update Button */}
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity 
-          style={styles.updateButton}
-          onPress={handleUpdate}
-        >
-          <Text style={styles.updateButtonText}>Update</Text>
-        </TouchableOpacity>
-      </View>
-      </View>
+        {/* Update Button */}
+        <View style={styles.bottomContainer}>
+          <TouchableOpacity
+            style={styles.updateButton}
+            onPress={handleUpdate}
+          >
+            <Text style={styles.updateButtonText}>Update</Text>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Date Picker Modal */}
       <DatePickerModal
@@ -550,7 +566,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingVertical: 24,
-    paddingHorizontal: 20,
+    paddingHorizontal: 5,
     marginTop: 8,
   },
   errorContainer: {
@@ -571,7 +587,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.textPrimary,
-    marginBottom: 15,
+    marginBottom: 5,
+    marginHorizontal:10
   },
   pinBoxContainer: {
     flexDirection: 'row',
@@ -620,14 +637,14 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   input: {
     borderWidth: 1,
     borderColor: colors.borderDivider,
     borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     fontSize: 16,
     color: colors.textDark,
     backgroundColor: colors.backgroundCard,
@@ -642,7 +659,7 @@ const styles = StyleSheet.create({
     borderColor: colors.borderDivider,
     borderRadius: 8,
     paddingHorizontal: 15,
-    paddingVertical: 15,
+    paddingVertical: 10,
     fontSize: 16,
     color: colors.textDark,
     backgroundColor: colors.backgroundCard,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,8 +10,12 @@ import {
   StatusBar,
   Modal,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
         } from 'react-native';
         import Ionicons from 'react-native-vector-icons/Ionicons';
+import { useDispatch, useSelector } from 'react-redux';
+import { setPersonalInfo } from '../../../store/slices/profileSlice';
 import BackButton from '../../../components/BackButton';
 import { colors } from '../../../theme/colors';
 
@@ -43,16 +47,51 @@ const countries = [
 
 export default function UpdateInformationScreen({ route, navigation }) {
   const { phoneNumber, countryCode } = route.params;
+  const dispatch = useDispatch();
+  const storedInfo = useSelector((state) => state.profile.personalInfo);
   
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [invitationCode, setInvitationCode] = useState('');
+  // Parse fullName into firstName and lastName if it exists
+  const getInitialName = () => {
+    if (storedInfo.fullName) {
+      const nameParts = storedInfo.fullName.trim().split(' ');
+      if (nameParts.length >= 2) {
+        return {
+          firstName: nameParts[0],
+          lastName: nameParts.slice(1).join(' '),
+        };
+      }
+      return { firstName: nameParts[0], lastName: '' };
+    }
+    return { firstName: '', lastName: '' };
+  };
+
+  const initialName = getInitialName();
+  
+  const [firstName, setFirstName] = useState(initialName.firstName);
+  const [lastName, setLastName] = useState(initialName.lastName);
+  const [email, setEmail] = useState(storedInfo.email || '');
+  const [invitationCode, setInvitationCode] = useState(storedInfo.referralCode || '');
   const [selectedCountry] = useState(
     countries.find(c => c.dial_code === countryCode) || countries[0]
   );
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [focusedField, setFocusedField] = useState(null);
+
+  // Update form fields when storedInfo changes
+  useEffect(() => {
+    if (storedInfo.fullName) {
+      const nameParts = storedInfo.fullName.trim().split(' ');
+      if (nameParts.length >= 2) {
+        setFirstName(nameParts[0]);
+        setLastName(nameParts.slice(1).join(' '));
+      } else {
+        setFirstName(nameParts[0] || '');
+        setLastName('');
+      }
+    }
+    setEmail(storedInfo.email || '');
+    setInvitationCode(storedInfo.referralCode || '');
+  }, [storedInfo]);
 
   const handleSave = () => {
     // Validate required fields
@@ -60,6 +99,15 @@ export default function UpdateInformationScreen({ route, navigation }) {
       alert('Please fill in all required fields');
       return;
     }
+    
+    // Save to Redux store
+    const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+    dispatch(setPersonalInfo({
+      fullName,
+      email,
+      phoneNumber,
+      referralCode: invitationCode || '', // Store invitation code as referralCode
+    }));
     
     // Navigate to EnterAuthCode screen
     navigation.navigate('EnterAuthCode', {
@@ -90,11 +138,17 @@ export default function UpdateInformationScreen({ route, navigation }) {
       </View>
 
       {/* Form Content */}
-      <ScrollView 
+      <KeyboardAvoidingView
         style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* First Name */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>First Name*</Text>
@@ -171,6 +225,7 @@ export default function UpdateInformationScreen({ route, navigation }) {
           </View>
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Save Button */}
       <View style={styles.bottomContainer}>
@@ -225,13 +280,13 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 60,
+    top: 40,
     left: 20,
     zIndex: 10,
   },
   header: {
     alignItems: 'center',
-    paddingTop: 110,
+    paddingTop: 80,
     paddingBottom: 20,
     paddingHorizontal: 20,
     backgroundColor: colors.backgroundCard,
@@ -250,20 +305,21 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   label: {
     fontSize: 14,
     fontWeight: '600',
+    marginLeft:10,
     color: colors.textPrimary,
-    marginBottom: 8,
+    marginBottom: 0,
   },
   input: {
     borderWidth: 1,
     borderColor: colors.borderDivider,
     borderRadius: 8,
     paddingHorizontal: 15,
-    paddingVertical: 15,
+    paddingVertical: 10,
     fontSize: 16,
     color: colors.textDark,
     backgroundColor: colors.backgroundCard,

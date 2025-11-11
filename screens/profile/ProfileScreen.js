@@ -79,6 +79,11 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleCameraIconPress = () => {
+    // Navigate to camera screen for taking photo
+    navigation.navigate('FaceCaptureCamera', { source: 'profile' });
+  };
+
     return (
         <LinearGradient
             colors={getGradientColors()}
@@ -95,8 +100,8 @@ export default function ProfileScreen() {
             >
                 {/* Profile Section */}
                 <View style={styles.profileSection}>
+                    <View style={styles.profileImageContainer}>
                     <TouchableOpacity
-                      style={styles.profileImageContainer}
                       activeOpacity={0.85}
                       onPress={handleChangePhoto}
                     >
@@ -109,11 +114,16 @@ export default function ProfileScreen() {
                           }
                           style={styles.profileImage}
                         />
-                        <View style={styles.cameraBadge}>
-                          <MaterialIcons name="photo-camera" size={20} color={colors.textLight} />
                         </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.cameraBadge}
+                        activeOpacity={0.85}
+                        onPress={handleCameraIconPress}
+                      >
+                        <MaterialIcons name="photo-camera" size={20} color={colors.textLight} />
+                      </TouchableOpacity>
                       </View>
-                    </TouchableOpacity>
                     <Text style={styles.profileName}>{profileName}</Text>
                     <Text style={styles.profileRole}>{personalInfo.role || 'Caregiver'}</Text>
                 </View>
@@ -126,12 +136,17 @@ export default function ProfileScreen() {
                       activeOpacity={0.85}
                       onPress={() => {
                         if (storedMPin) {
+                          // MPin exists, show MPin check page
                           navigation.navigate('EnterMPin', {
                             redirectTo: 'PersonalDetails',
-                            onSuccess: () => navigation.navigate('PersonalDetails'),
                           });
                         } else {
-                          navigation.navigate('PersonalDetails');
+                          // MPin doesn't exist, navigate to SetupMPin (only available one time)
+                          navigation.navigate('SetupMPin', {
+                            phoneNumber: personalInfo.phoneNumber || '',
+                            countryCode: '+1',
+                            source: 'profile',
+                          });
                         }
                       }}
                     >
@@ -212,6 +227,7 @@ const styles = StyleSheet.create({
     },
     profileImageContainer: {
         marginBottom: 10,
+        position: 'relative',
     },
     profileImageWrapper: {
         borderWidth: 2,

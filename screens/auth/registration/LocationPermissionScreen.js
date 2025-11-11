@@ -10,8 +10,10 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import { useDispatch } from 'react-redux';
 import BackButton from '../../../components/BackButton';
 import { colors } from '../../../theme/colors';
+import { setLocationPermission } from '../../../store/slices/profileSlice';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -22,10 +24,18 @@ const features = [
 ];
 
 export default function LocationPermissionScreen({ route, navigation }) {
+  const dispatch = useDispatch();
+  
   const handleEnablePermission = async () => {
     // In a real app, you would request location permission here
-    // For now, we'll just navigate to the next screen
-    navigation.navigate('KYCVerification');
+    // For now, we'll just mark it as granted and navigate to MainApp
+    dispatch(setLocationPermission(true));
+    
+    // Navigate to MainApp with Profile tab as initial route
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'MainApp', params: { initialRoute: 'Profile' } }],
+    });
   };
 
   return (
@@ -36,8 +46,8 @@ export default function LocationPermissionScreen({ route, navigation }) {
       <View style={styles.backButton}>
         <BackButton 
           onPress={() => navigation.navigate('CompleteProfile', route.params || {})}
-          color={colors.textPrimary}
-          activeColor="rgba(12, 64, 58, 0.1)"
+          color={colors.textLight}
+          activeColor="rgba(255, 255, 255, 0.5)"
         />
       </View>
 

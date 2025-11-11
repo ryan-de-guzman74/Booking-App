@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -12,63 +12,55 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
-import { useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import BottomNav from '../../components/BottomNav';
+import { useRoute } from '@react-navigation/native';
+import { Animated } from 'react-native';
 import { colors, getGradientColors, getGradientLocations } from '../../theme/colors';
-import { bookingDetailsData } from '../../data/sampleBookings';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-// BottomNav height is approximately 70px (including padding and safe area)
+// Bottom nav height approximation
 const BOTTOM_NAV_HEIGHT = Platform.OS === 'ios' ? 88 : 70;
 const AVAILABLE_HEIGHT = screenHeight - BOTTOM_NAV_HEIGHT;
 
-// Colorful 3-color palette
-const COLOR_PALETTE = {
-  primary: colors.primary,        // Main background color (dark teal)
-  secondary: 'rgb(0, 64, 0)',         // Vibrant Orange for accents
-  tertiary: 'rgb(3, 124, 3)',
-  metric: 'rgba(0, 145, 109, 0.74)'           // Vibrant Purple for accents
-};
-
-const METRICS = [
-  { id: 1, label: 'Earnings', icon: 'dollar-sign', iconType: 'FontAwesome5' },
-  { id: 2, label: 'Hours', icon: 'clock', iconType: 'FontAwesome5' },
-  { id: 3, label: 'Streak', value: '8.5' },
-  { id: 4, label: 'Rating', value: '4.9' },
-];
-
-const formatCurrency = (value) => `$${value.toFixed(2)}`;
-
 export default function DashboardScreen() {
-  const navigation = useNavigation();
+  const personalInfo = useSelector((state) => state.profile.personalInfo);
+  const profileName = personalInfo.fullName || 'Caretaker Snah';
+  const avatarUri = personalInfo.avatar;
+  const [isPowerOn, setIsPowerOn] = useState(false);
+  const route = useRoute();
+  const showAcceptToast = route?.params?.acceptedToast;
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTranslateY = useRef(new Animated.Value(20)).current;
 
-  const careOpportunities = useMemo(
-    () =>
-      bookingDetailsData.slice(0, 3).map((booking, index) => {
-        const addressLabel = booking.address.split(',')[0];
-        return {
-          id: booking.id,
-          title: booking.service,
-          location: addressLabel,
-          rate: formatCurrency(booking.earning),
-          time: `${booking.startTime} - ${booking.endTime}`,
-          icon: index === 1 ? 'accessible' : index === 2 ? 'medication' : 'person',
-          iconType: 'MaterialIcons',
-          hasIndicator: index === 1,
-        };
-      }),
-    [],
-  );
-
-  const renderIcon = (iconType, iconName, size = 20, color = colors.primary) => {
-    switch (iconType) {
-      case 'FontAwesome5':
-        return <FontAwesome5 name={iconName} size={size} color={color} />;
-      case 'MaterialIcons':
-        return <MaterialIcons name={iconName} size={size} color={color} />;
-      default:
-        return null;
+  useEffect(() => {
+    if (showAcceptToast) {
+      Animated.parallel([
+        Animated.timing(toastOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(toastTranslateY, { toValue: 0, duration: 200, useNativeDriver: true }),
+      ]).start();
+      const t = setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(toastOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+          Animated.timing(toastTranslateY, { toValue: 20, duration: 200, useNativeDriver: true }),
+        ]).start();
+      }, 2500);
+      return () => clearTimeout(t);
     }
+  }, [showAcceptToast, toastOpacity, toastTranslateY]);
+
+  // Sample data - replace with actual data from your state/API
+  const income = 132.10;
+  const withdrawal = 0.00;
+  const earningData = [0, 0, 0, 0, 0, 0, 132.10]; // Last 7 days earnings
+
+  const maxEarning = Math.max(...earningData, 100);
+  // Make graph height relative to screen height (increased from 120 to ~20% of screen)
+  const graphHeight = screenHeight * 0.2;
+  const graphWidth = screenWidth - 60;
+
+  const handlePowerToggle = () => {
+    setIsPowerOn(!isPowerOn);
   };
 
   return (
@@ -80,116 +72,142 @@ export default function DashboardScreen() {
       style={styles.container}
     >
       <StatusBar barStyle="light-content" />
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.acceptToast, { opacity: toastOpacity, transform: [{ translateY: toastTranslateY }] }]}
+      >
+        <Text style={styles.acceptToastTitle}>{profileName}</Text>
+        <Text style={styles.acceptToastMsg}>Accepted Successfully!</Text>
+      </Animated.View>
 
-      <View style={styles.content}>
-        {/* Part 1: Page Header (35%) */}
-        <View style={styles.headerPart}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <View style={styles.logoCircle}>
+      <View style={styles.contentContainer}>
+        {/* Part 1: Profile Section + Action Cards */}
+        <View style={styles.partContainer}>
+          <View style={styles.profileSection}>
               <Image
-                source={require('../../assets/Logo.jpeg')}
-                style={styles.logoImage}
-                resizeMode="cover"
-              />
+              source={
+                avatarUri
+                  ? { uri: avatarUri }
+                  : require('../../assets/img/avatar.jpg')
+              }
+              style={styles.profileImage}
+            />
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeText}>Hi {profileName},</Text>
+              <Text style={styles.welcomeSubtext}>Welcome Back to SNAH!</Text>
             </View>
           </View>
 
-          {/* Welcome Section */}
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeText}>Welcome back, Paulina</Text>
-            <Text style={styles.careSummary}>
-              You've cared for 23 families this month—keep it going!
-            </Text>
+          {/* Action Cards */}
+          <View style={styles.actionCard}>
+            <TouchableOpacity style={styles.actionItem} onPress={handlePowerToggle}>
+              <View style={[styles.powerButton, { backgroundColor: isPowerOn ? '#4CAF50' : '#EF4444' }]}>
+                <MaterialIcons name="power-settings-new" size={24} color={colors.textLight} />
+              </View>
+            </TouchableOpacity>
 
-            {/* Online Status */}
-            <TouchableOpacity style={styles.onlineStatus}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.onlineText}>Online</Text>
+            <TouchableOpacity style={styles.actionItem}>
+              <View style={styles.actionIconContainer}>
+                <MaterialIcons name="receipt" size={28} color={colors.primary} />
+              </View>
+              <Text style={styles.actionLabel}>My Billing</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionItem}>
+              <View style={styles.actionIconContainer}>
+                <MaterialIcons name="phone" size={28} color={colors.primary} />
+              </View>
+              <Text style={styles.actionLabel}>Help Center</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Part 2: Care Opportunities (35%) */}
-        <View style={styles.opportunitiesPart}>
-          <Text style={styles.sectionTitle}>Care Opportunities</Text>
-          <View style={styles.opportunitiesContainer}>
-            {careOpportunities.map((opportunity, index) => {
-              // Alternate between secondary and tertiary colors for icon backgrounds
-              return (
-                <TouchableOpacity
-                  key={opportunity.id}
-                  style={styles.opportunityCard}
-                  activeOpacity={0.9}
-                  onPress={() =>
-                    navigation.navigate('BookingDetails', {
-                      bookingId: opportunity.id,
-                      mode: 'confirm',
-                    })
-                  }
-                >
-                  <View style={[styles.opportunityIconContainer]}>
-                    {renderIcon(opportunity.iconType, opportunity.icon, 28, '#FFFFFF')}
+        {/* Part 2: Last 30 Days Section + Income/Withdrawal Cards */}
+        <View style={styles.partContainer}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionTitleContainer}>
+              <MaterialIcons name="cloud" size={16} color={colors.textLight} />
+              <Text style={styles.sectionTitle}>Last 30 days</Text>
                   </View>
-                <View style={styles.opportunityContent}>
-                  <View style={styles.opportunityTitleRow}>
-                    <Text style={styles.opportunityTitle}>{opportunity.title}</Text>
-                    <Text style={styles.opportunityRate}>{opportunity.rate}</Text>
                   </View>
-                  <View style={styles.opportunitySubtitleRow}>
-                    <Text style={styles.opportunityLocation}>{opportunity.location}</Text>
-                    <View style={styles.opportunityTimeContainer}>
-                      {opportunity.hasIndicator && <View style={styles.timeIndicator} />}
-                      <Text style={styles.opportunityTime}>{opportunity.time}</Text>
+
+          {/* Income and Withdrawal Cards */}
+          <View style={styles.metricsRow}>
+            <View style={[styles.metricCard, styles.incomeCard]}>
+              <MaterialIcons name="trending-up" size={screenHeight * 0.05} color="#8B5CF6" style={styles.metricIcon} />
+              <View style={styles.metricContent}>
+                <Text style={styles.metricValue}>${income.toFixed(2)}</Text>
+                <Text style={styles.metricLabel}>Income</Text>
                     </View>
+            </View>
+
+            <View style={[styles.metricCard, styles.withdrawalCard]}>
+              <MaterialIcons name="trending-down" size={screenHeight * 0.05} color="#F97316" style={styles.metricIcon} />
+              <View style={styles.metricContent}>
+                <Text style={styles.metricValue}>${withdrawal.toFixed(2)}</Text>
+                <Text style={styles.metricLabel}>Withdrawal</Text>
                   </View>
                 </View>
-              </TouchableOpacity>
-              );
-            })}
           </View>
         </View>
 
-        {/* Part 3: Extra (30%) */}
-        <View style={styles.extraPart}>
-          {/* Performance Metrics */}
-          <View style={styles.metricsContainer}>
-            {METRICS.map((metric, index) => {
-              // Use different colors for each metric
-              const metricColors = [
-                COLOR_PALETTE.secondary,  // Earnings - Orange
-                COLOR_PALETTE.tertiary,   // Hours - Purple
-                COLOR_PALETTE.secondary,  // Streak - Orange
-                COLOR_PALETTE.tertiary,   // Rating - Purple
-              ];
+        {/* Part 3: Last 7 days + Earning Statistics + Graph */}
+        <View style={styles.partContainer}>
+          <View style={styles.statsSection}>
+            <Text style={styles.statsTitle}>Last 7 days</Text>
+            <Text style={styles.statsSubtitle}>Earning Statistics</Text>
+
+            {/* Graph */}
+            <View style={styles.graphContainer}>
+              {/* Y-axis labels */}
+              <View style={styles.yAxisContainer}>
+                {[500, 400, 300, 200, 100].map((value) => (
+                  <Text key={value} style={styles.yAxisLabel}>
+                    ${value}
+                  </Text>
+                ))}
+              </View>
+
+              {/* Graph area */}
+              <View style={styles.graphArea}>
+                {/* Grid lines */}
+                {[0, 1, 2, 3, 4].map((index) => (
+                  <View
+                    key={index}
+                    style={[
+                      styles.gridLine,
+                      { top: (index * graphHeight) / 4 },
+                    ]}
+                  />
+                ))}
+
+                {/* Bars */}
+                <View style={styles.barsContainer}>
+                  {earningData.map((value, index) => {
+                    const barHeight = (value / maxEarning) * graphHeight;
+                    // Calculate available width accounting for margins (2% on each side)
+                    const availableWidth = graphWidth - (screenWidth * 0.04);
+                    const barSpacing = availableWidth / earningData.length;
+                    const barWidth = barSpacing * 0.6-5;
+                    const marginOffset = screenWidth * 0.02;
               return (
-                <View key={metric.id} style={styles.metricItem}>
-                  <View style={[styles.metricIconOuter]}>
-                    <View style={styles.metricIconInner}>
-                      {metric.icon ? (
-                        renderIcon(metric.iconType, metric.icon, 20, '#FFFFFF')
-                      ) : (
-                        <Text style={styles.metricValue}>{metric.value}</Text>
-                      )}
-                    </View>
-                  </View>
-                  <Text style={styles.metricLabel}>{metric.label}</Text>
-                </View>
+                      <View
+                        key={index}
+                        style={[
+                          styles.bar,
+                          {
+                            height: Math.max(barHeight, 4),
+                            left: (index * barSpacing),
+                            width: barWidth,
+                          },
+                        ]}
+                      />
               );
             })}
           </View>
-
-          {/* Bonus Message */}
-          <View style={styles.bonusCard}>
-            <Text style={styles.bonusText}>
-              You're 1 shift away from your $100 weekly bonus
-            </Text>
+              </View>
+            </View>
           </View>
-
-          {/* Add Availability Button */}
-          <TouchableOpacity style={[styles.addAvailabilityButton, { borderColor: COLOR_PALETTE.tertiary }]}>
-            <Text style={[styles.addAvailabilityText, { color: COLOR_PALETTE.tertiary }]}>+ Add Availability</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -202,262 +220,242 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
+  acceptToast: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 36,
+    backgroundColor: '#E6F4EA',
+    borderRadius: 5,
+    padding: 12,
+    zIndex: 5,
   },
-  // Part 1: Header (35%)
-  headerPart: {
-    height: AVAILABLE_HEIGHT * 0.35,
-    justifyContent: 'flex-start',
-    paddingTop: Platform.OS === 'ios' ? 50 : 30,
+  acceptToastTitle: {
+    color: '#2E7D32',
+    fontWeight: '800',
+    fontSize: 14,
   },
-  logoContainer: {
+  acceptToastMsg: {
+    color: '#2E7D32',
+    fontWeight: '600',
+    fontSize: 12,
+    opacity: 0.9,
+  },
+  contentContainer: {
+    height: AVAILABLE_HEIGHT,
+    paddingTop: Platform.OS === 'ios' ? screenHeight * 0.06 : screenHeight * 0.04,
+    paddingHorizontal: screenWidth * 0.05,
+    justifyContent: 'space-around',
+    paddingBottom: screenHeight * 0.01,
+  },
+  partContainer: {
+    flexShrink: 0,
+  },
+  profileSection: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: screenHeight * 0.045,
   },
-  logoCircle: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: COLOR_PALETTE.secondary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+  profileImage: {
+    width: screenHeight * 0.095,
+    height: screenHeight * 0.095,
+    borderRadius: screenHeight * 0.0475,
+    borderWidth: 2,
+    borderColor: colors.textLight,
+    marginRight: screenWidth * 0.03,
   },
-  logoImage: {
-    width: '115%',
-    height: '115%',
-  },
-  welcomeSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  welcomeTextContainer: {
     flex: 1,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 4,
+    fontSize: screenHeight * 0.04,
+    fontWeight: '600',
+    color: colors.textLight,
+    marginBottom: screenHeight * 0.002,
   },
-  careSummary: {
-    fontSize: 11,
-    fontWeight: '300',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    marginBottom: 6,
-    marginHorizontal: 30,
-    lineHeight: 14,
+  welcomeSubtext: {
+    fontSize: screenHeight * 0.02,
+    fontWeight: '400',
+    color: colors.textLight,
+    opacity: 0.9,
   },
-  onlineStatus: {
+  actionCard: {
+    backgroundColor: colors.backgroundCard,
+    borderRadius: screenHeight * 0.02,
+    padding: screenHeight * 0.02,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#03C03C',
-    borderRadius: 20,
-    paddingVertical: 4,
-    paddingHorizontal: 16,
-    marginTop: 4,
-    elevation: 4,
+    justifyContent: 'space-around',
+    position: 'relative',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
+    elevation: 3,
   },
-  onlineDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#FFFFFF',
-    marginRight: 6,
+  actionItem: {
+    alignItems: 'center',
+    flex: 1,
   },
-  onlineText: {
-    fontSize: 14,
+  powerButton: {
+    width: screenHeight * 0.08,
+    height: screenHeight * 0.08,
+    borderRadius: screenHeight * 0.04,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionIconContainer: {
+    width: screenHeight * 0.07,
+    height: screenHeight * 0.07,
+    borderRadius: screenHeight * 0.02,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: screenHeight * 0.01,
+  },
+  actionLabel: {
+    fontSize: screenHeight * 0.018,
     fontWeight: '500',
-    color: '#FFFFFF',
+    color: colors.textPrimary,
   },
-  // Part 2: Care Opportunities (35%)
-  opportunitiesPart: {
-    height: AVAILABLE_HEIGHT * 0.4,
-    justifyContent: 'flex-start',
-    paddingTop: 8,
+  notificationText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: colors.textLight,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexShrink: 0,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom:5
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: screenHeight * 0.03,
     fontWeight: '500',
-    color: '#FFFFFF',
-    marginBottom: 8,
-    marginLeft: screenWidth * 0.05,
+    color: colors.textLight,
+    marginLeft: screenWidth * 0.015,
   },
-  opportunitiesContainer: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: screenWidth * 0.02,
-    paddingBottom: 0,
-  },
-  opportunityCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 14,
-    padding: 8,
-    flex: 1,
-    minHeight: 0,
-    marginBottom: 10
-  },
-  opportunityIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  notificationBadgeSmall: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
-    backgroundColor: COLOR_PALETTE.tertiary,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
-  opportunityContent: {
-    flex: 1,
+  notificationTextSmall: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: colors.textLight,
   },
-  opportunityTitleRow: {
+  metricsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
+    gap: screenWidth * 0.04,
+    flexShrink: 0,
   },
-  opportunityTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
+  metricCard: {
     flex: 1,
-  },
-  opportunityRate: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLOR_PALETTE.secondary,
-  },
-  opportunitySubtitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  opportunityLocation: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.textTertiary,
-    flex: 1,
-  },
-  opportunityTimeContainer: {
+    borderRadius: screenHeight * 0.02,
+    padding: screenHeight * 0.022,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  timeIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLOR_PALETTE.secondary,
-    marginRight: 4,
+  metricIcon: {
+    marginRight: screenWidth * 0.03,
   },
-  opportunityTime: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textPrimary,
-  },
-  // Part 3: Extra (30%)
-  extraPart: {
-    height: AVAILABLE_HEIGHT * 0.25,
-    justifyContent: 'flex-start',
-    paddingTop: 0,
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    marginBottom: 8,
-    paddingHorizontal: screenWidth * 0.05,
-  },
-  metricItem: {
-    alignItems: 'center',
+  metricContent: {
     flex: 1,
   },
-  metricIconOuter: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLOR_PALETTE.metric,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+  incomeCard: {
+    backgroundColor: '#F3E8FF',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  metricIconInner: {
-    width: 35,
-    height: 35,
-    borderRadius: 18,
-
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
+  withdrawalCard: {
+    backgroundColor: '#FFF4E6',
+    shadowColor: '#F97316',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   metricValue: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#FFFFFF',
+    fontSize: screenHeight * 0.025,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: screenHeight * 0.008,
   },
   metricLabel: {
-    fontSize: 10,
-    fontWeight: '300',
-    color: '#FFFFFF',
-    textAlign: 'center',
+    fontSize: screenHeight * 0.017,
+    fontWeight: '500',
+    color: colors.textPrimary,
   },
-  bonusCard: {
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 8,
-    marginHorizontal: screenWidth * 0.05,
-    backgroundColor: colors.primary,
+  statsSection: {
+    flexShrink: 0,
   },
-  bonusText: {
-    fontSize: 12,
+  statsTitle: {
+    fontSize: screenHeight * 0.02,
     fontWeight: '400',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 16,
+    color: colors.textLight,
+    marginBottom: screenHeight * 0.005,
   },
-  addAvailabilityButton: {
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 25,
-    borderWidth: 2.5,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    alignSelf: 'center',
-    marginTop: 4,
-    elevation: 4,
-    shadowColor: COLOR_PALETTE.tertiary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  addAvailabilityText: {
-    fontSize: 14,
+  statsSubtitle: {
+    fontSize: screenHeight * 0.03,
     fontWeight: '700',
+    color: colors.textLight,
+    marginBottom: screenHeight * 0.015,
+  },
+  graphContainer: {
+    flexDirection: 'row',
+    height: screenHeight * 0.2,
+  },
+  yAxisContainer: {
+    width: screenWidth * 0.1,
+    justifyContent: 'space-between',
+    paddingRight: screenWidth * 0.02,
+  },
+  yAxisLabel: {
+    fontSize: screenHeight * 0.012,
+    fontWeight: '400',
+    color: colors.textLight,
+    opacity: 0.7,
+  },
+  graphArea: {
+    flex: 1,
+    position: 'relative',
+    borderLeftWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: colors.textLight,
+    marginLeft: screenWidth * 0.02,
+    marginRight: screenWidth * 0.02,
+  },
+  gridLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: colors.textLight,
+    opacity: 0.2,
+  },
+  barsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: screenHeight * 0.16,
+  },
+  bar: {
+    position: 'absolute',
+    backgroundColor: 'rgb(255, 230, 0)',
+    bottom: 0,
   },
 });
-

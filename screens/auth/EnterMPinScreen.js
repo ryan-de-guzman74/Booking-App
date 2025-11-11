@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import BackButton from '../../components/BackButton';
 import { colors } from '../../theme/colors';
@@ -81,7 +83,11 @@ export default function EnterMPinScreen({ route, navigation }) {
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         <Text style={styles.title}>Enter M-Pin</Text>
         <Text style={styles.instruction}>
           Enter your 4-digit M-Pin to access this section
@@ -118,7 +124,7 @@ export default function EnterMPinScreen({ route, navigation }) {
           secureTextEntry
           autoFocus
         />
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }

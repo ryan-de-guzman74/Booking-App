@@ -29,8 +29,8 @@ export default function KYCVerificationScreen({ navigation }) {
       <View style={styles.backButton}>
         <BackButton 
           onPress={() => navigation.navigate('LocationPermission')}
-          color={colors.textPrimary}
-          activeColor="rgba(12, 64, 58, 0.1)"
+          color={colors.textLight}
+          activeColor="rgba(255, 255, 255, 0.5)"
         />
       </View>
 

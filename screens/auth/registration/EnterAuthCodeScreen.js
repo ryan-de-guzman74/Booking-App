@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import BackButton from '../../../components/BackButton';
 import { colors } from '../../../theme/colors';
@@ -67,7 +69,8 @@ export default function EnterAuthCodeScreen({ route, navigation }) {
       return;
     }
 
-    navigation.navigate('SetupMPin', {
+    // After 6-digit authentication, navigate to LocationPermission
+    navigation.navigate('LocationPermission', {
       phoneNumber,
       countryCode,
     });
@@ -98,7 +101,11 @@ export default function EnterAuthCodeScreen({ route, navigation }) {
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         <Text style={styles.title}>Enter Authentication Code</Text>
         <Text style={styles.instruction}>
           Enter the 6 digit number sent to you via text or email
@@ -151,7 +158,7 @@ export default function EnterAuthCodeScreen({ route, navigation }) {
         >
           <Text style={styles.doneButtonText}>Done</Text>
         </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -170,7 +177,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 30,
-    paddingTop: 120,
+    paddingTop: 100,
   },
   title: {
     fontSize: 26,
@@ -191,7 +198,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.primary,
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 20,
   },
   codeInputContainer: {
     flexDirection: 'row',
@@ -227,7 +234,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 100,
+    marginBottom: 25,
   },
   resendTextContainer: {
     flexDirection: 'row',
@@ -253,7 +260,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
+    marginTop: 0,
   },
   doneButtonDisabled: {
     backgroundColor: colors.borderMuted,

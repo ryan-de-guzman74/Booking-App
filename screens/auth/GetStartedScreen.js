@@ -24,6 +24,8 @@ const getStartedPages = [
 ];
 
 export default function GetStartedScreen({ navigation }) {
+  console.log('GetStartedScreen rendering...');
+  
   const [currentPage, setCurrentPage] = useState(0);
   const flatListRef = useRef(null);
 
@@ -107,7 +109,7 @@ export default function GetStartedScreen({ navigation }) {
           onPress={handleGetStarted}
         >
           <Text style={styles.getStartedText}>
-            {currentPage === getStartedPages.length - 1 ? 'Get Started' : 'Next'}
+            Next
           </Text>
         </TouchableOpacity>
       </View>

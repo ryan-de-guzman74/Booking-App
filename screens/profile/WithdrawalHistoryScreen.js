@@ -200,12 +200,26 @@ export default function WithdrawalHistoryScreen() {
                     >
                       <View style={styles.bankCardContent}>
                         <View style={styles.bankCardLeft}>
-                          <Text style={styles.bankCardLabel}>Bank Name</Text>
-                          <Text style={styles.bankCardValue}>{bank.bankName}</Text>
-                          <Text style={styles.bankCardLabel}>Account Holder Name</Text>
-                          <Text style={styles.bankCardValue}>{bank.accountHolderName}</Text>
-                          <Text style={styles.bankCardLabel}>Account No</Text>
-                          <Text style={styles.bankCardAccountNumber}>{maskAccountNumber(bank.accountNumber)}</Text>
+                          {/* Bank Name Row */}
+                          <View style={styles.bankCardRow}>
+                            <MaterialIcons name="account-balance" size={20} color={colors.textLight} style={styles.bankCardIcon} />
+                            <Text style={styles.bankCardLabel}>Bank Name:</Text>
+                            <Text style={styles.bankCardValue}>{bank.bankName}</Text>
+                          </View>
+                          
+                          {/* Account Holder Name Row */}
+                          <View style={styles.bankCardRow}>
+                            <MaterialIcons name="person" size={20} color={colors.textLight} style={styles.bankCardIcon} />
+                            <Text style={styles.bankCardLabel}>Account Holder:</Text>
+                            <Text style={styles.bankCardValue}>{bank.accountHolderName}</Text>
+                          </View>
+                          
+                          {/* Account Number Row */}
+                          <View style={styles.bankCardRow}>
+                            <MaterialIcons name="credit-card" size={20} color={colors.textLight} style={styles.bankCardIcon} />
+                            <Text style={styles.bankCardLabel}>Account No:</Text>
+                            <Text style={styles.bankCardAccountNumber}>{maskAccountNumber(bank.accountNumber)}</Text>
+                          </View>
                         </View>
                         {selectedBankId === bank.id && (
                           <View style={styles.selectedIndicator}>
@@ -429,7 +443,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: screenHeight * 0.85,
+    height: screenHeight * 0.65,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -466,7 +480,7 @@ const styles = StyleSheet.create({
   bankCard: {
     backgroundColor: colors.primary,
     borderRadius: 12,
-    padding: 16,
+    padding: 10,
     marginBottom: 12,
     borderWidth: 2,
     borderColor: 'transparent',
@@ -481,23 +495,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bankCardLeft: {
-    flex: 1,
+    flex: 1
+  },
+  bankCardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  bankCardIcon: {
+    marginRight: 8,
   },
   bankCardLabel: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.9)',
+    marginRight: 8,
   },
   bankCardValue: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.textLight,
-    marginBottom: 8,
+    flex: 1,
   },
   bankCardAccountNumber: {
     fontSize: 16,
     fontWeight: '700',
     color: '#FF5252',
+    flex: 1,
   },
   selectedIndicator: {
     marginLeft: 12,
@@ -512,8 +536,8 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
     borderStyle: 'dashed',
     borderRadius: 12,
-    paddingVertical: 16,
-    marginBottom: 24,
+    paddingVertical: 14,
+    marginBottom: 10,
     gap: 8,
   },
   addBankText: {
@@ -525,12 +549,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     fontSize: 16,
     color: colors.textPrimary,
     borderWidth: 2,
     borderColor: 'transparent',
-    marginBottom: 24,
+    marginBottom: 10,
   },
   amountInputFocused: {
     borderColor: colors.primary,

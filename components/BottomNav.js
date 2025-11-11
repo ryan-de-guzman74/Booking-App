@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import { colors } from '../theme/colors';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -17,8 +18,9 @@ export default function BottomNav() {
   const navigation = useNavigation();
   const route = useRoute();
   const currentRoute = route.name;
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
 
-  const isDashboard = currentRoute === 'Dashboard';
+  const isDashboard = currentRoute === 'Dashboard' || currentRoute === 'VerifyAccount';
   const isProfile = currentRoute === 'Profile';
   const isBookings = currentRoute === 'Bookings';
   const isHistory = currentRoute === 'History';
@@ -27,6 +29,10 @@ export default function BottomNav() {
     // Navigate within the tab navigator
     // Since we're using a Tab Navigator, we can navigate directly to screen names
     try {
+      // If KYC not approved, only allow Dashboard (VerifyAccount) and Profile
+      if (!kycApproved && (screenName === 'Bookings' || screenName === 'History')) {
+        return; // Disable navigation
+      }
       navigation.navigate(screenName);
     } catch (error) {
       console.error('Navigation error:', error);
@@ -57,20 +63,20 @@ export default function BottomNav() {
           ) : (
             <Text style={styles.homestyle}></Text>
           )}
-
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.navItem}
+          style={[styles.navItem, !kycApproved && styles.navItemDisabled]}
           onPress={() => handleNavigation('Bookings')}
+          disabled={!kycApproved}
         >
           <Ionicons
             name={isBookings ? 'calendar' : 'calendar-outline'}
             size={28}
-            color={isBookings ? colors.primary : colors.textMuted}
+            color={!kycApproved ? colors.borderMuted : (isBookings ? colors.primary : colors.textMuted)}
           />
           {!isDashboard ? (
-            <Text style={[styles.navLabel, isDashboard ? styles.navLabelActive : styles.navLabelInactive]}>
+            <Text style={[styles.navLabel, !kycApproved && styles.navLabelDisabled, isDashboard ? styles.navLabelActive : styles.navLabelInactive]}>
               Bookings
             </Text>
           ) : (
@@ -79,16 +85,17 @@ export default function BottomNav() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={styles.navItem}
+          style={[styles.navItem, !kycApproved && styles.navItemDisabled]}
           onPress={() => handleNavigation('History')}
+          disabled={!kycApproved}
         >
           <Ionicons
             name={isHistory ? 'time' : 'time-outline'}
             size={28}
-            color={isHistory ? colors.primary : colors.textMuted}
+            color={!kycApproved ? colors.borderMuted : (isHistory ? colors.primary : colors.textMuted)}
           />
           {!isDashboard ? (
-            <Text style={[styles.navLabel, isDashboard ? styles.navLabelActive : styles.navLabelInactive]}>
+            <Text style={[styles.navLabel, !kycApproved && styles.navLabelDisabled, isDashboard ? styles.navLabelActive : styles.navLabelInactive]}>
               History
             </Text>
           ) : (
@@ -167,6 +174,12 @@ const styles = StyleSheet.create({
     height:0,
     margin:0,
     padding:0
-  }
+  },
+  navItemDisabled: {
+    opacity: 0.4,
+  },
+  navLabelDisabled: {
+    color: colors.borderMuted,
+  },
 });
 

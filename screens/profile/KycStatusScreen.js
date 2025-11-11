@@ -29,7 +29,7 @@ import { launchImageLibrary } from 'react-native-image-picker';
 
 import { KYC_DOCUMENTS, KYC_STATUS_META } from '../../config/kycDocuments';
 import { colors, getGradientColors, getGradientLocations } from '../../theme/colors';
-import { upsertKycDocument, removeKycDocument } from '../../store/slices/profileSlice';
+import { upsertKycDocument, removeKycDocument, setKycApproved } from '../../store/slices/profileSlice';
 
 const renderIcon = (iconType, iconName, size = 32) => {
   const tint = colors.primary;
@@ -64,6 +64,15 @@ export default function KycStatusScreen() {
   useEffect(() => {
     setSelectedDocument(getNextDocument(storedDocuments));
   }, [storedDocuments]);
+
+  // Auto-approve KYC when all required documents are uploaded here as well
+  useEffect(() => {
+    const allProvided = KYC_DOCUMENTS.every((def) => {
+      const rec = storedDocuments[def.id];
+      return rec && !!rec.uri;
+    });
+    dispatch(setKycApproved(allProvided));
+  }, [dispatch, storedDocuments]);
 
   const pendingCount = useMemo(() => {
     return Object.values(storedDocuments || {}).filter((doc) => doc.status !== 'approved').length;

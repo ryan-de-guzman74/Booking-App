@@ -111,7 +111,7 @@ export default function LoginScreen({ navigation }) {
           >
             <Text style={styles.flagEmoji}>{selectedCountry.flag}</Text>
             <Text style={styles.countryCode}>{selectedCountry.dial_code}</Text>
-            <Ionicons name="chevron-down" size={16} color={colors.textMuted} style={styles.chevron} />
+            <Ionicons name="chevron-down" size={16} color='black' style={styles.chevron} />
           </TouchableOpacity>
           <View style={styles.divider} />
           <TextInput
@@ -224,7 +224,7 @@ const styles = StyleSheet.create({
   },
   imageSection: {
     position: 'absolute',
-    top: screenHeight * 0.45 - (screenWidth * 0.35) - (screenWidth * 0.35),
+    top: screenHeight * 0.05,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -261,12 +261,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: screenHeight * 0.68,
+    height: screenHeight * 0.6,
     backgroundColor: colors.backgroundCard,
     borderTopLeftRadius: 35,
     borderTopRightRadius: 35,
     marginTop: screenWidth * 0.45,
-    paddingTop: screenWidth * 0.3,
+    paddingTop: 40,
     paddingHorizontal: 30,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },

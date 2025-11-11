@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useDispatch } from 'react-redux';
 import BackButton from '../../../components/BackButton';
@@ -16,7 +18,7 @@ import { setMPin } from '../../../store/slices/profileSlice';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 export default function SetupMPinScreen({ route, navigation }) {
-  const { phoneNumber, countryCode } = route.params;
+  const { phoneNumber, countryCode, source } = route.params || {};
   const dispatch = useDispatch();
   
   const [newPin, setNewPin] = useState('');
@@ -60,12 +62,19 @@ export default function SetupMPinScreen({ route, navigation }) {
 
     dispatch(setMPin(newPin));
 
-    // Navigate to CompleteProfile screen
+    const { source } = route.params || {};
+    
+    if (source === 'profile') {
+      // If coming from profile, navigate to PersonalDetails
+      navigation.navigate('PersonalDetails');
+    } else {
+      // Navigate to CompleteProfile screen (registration flow)
     navigation.navigate('CompleteProfile', {
       phoneNumber,
       countryCode,
       mPin: newPin
     });
+    }
   };
 
   const renderPinBoxes = (pinValue) => {
@@ -83,17 +92,21 @@ export default function SetupMPinScreen({ route, navigation }) {
       {/* Back Button */}
       <View style={styles.backButton}>
         <BackButton 
-          onPress={() => navigation.navigate('EnterAuthCode', {
-            phoneNumber,
-            countryCode
-          })}
+          onPress={() => {
+            // Navigate to ProfileScreen (in MainApp tab navigator)
+            navigation.navigate('MainApp', { screen: 'Profile' });
+          }}
           color={colors.textPrimary}
           activeColor="rgba(12, 64, 58, 0.1)"
         />
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         <Text style={styles.title}>Setup M-Pin</Text>
         {/* Error Message */}
         {error !== '' && (
@@ -161,7 +174,7 @@ export default function SetupMPinScreen({ route, navigation }) {
         >
           <Text style={styles.continueButtonText}>Continue</Text>
         </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -180,7 +193,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 30,
-    paddingTop: 120,
+    paddingTop: 100,
   },
   title: {
     fontSize: 26,
@@ -201,7 +214,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   pinSection: {
-    marginBottom: 40,
+    marginBottom: 20,
   },
   label: {
     fontSize: 16,
@@ -241,7 +254,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 60,
+    marginTop: 20,
   },
   continueButtonText: {
     color: colors.textLight,

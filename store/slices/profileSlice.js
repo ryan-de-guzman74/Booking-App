@@ -21,9 +21,15 @@ const initialState = {
   },
   kyc: {
     documents: {}, // keyed by document id
+    isApproved: false, // KYC approval status
   },
   banks: [], // Array of bank accounts
   withdrawals: [], // Array of withdrawal requests
+  locationPermissionGranted: false, // Location permission status
+  profileCompleted: false, // Profile completion status
+  profilePictureTaken: false, // Profile picture taken status
+  bookingStates: {}, // Object to store booking states by bookingId: { [bookingId]: 'on_the_way' | 'arrived' | ... }
+  incomingBooking: null, // When server pushes a new booking notification
 };
 
 const profileSlice = createSlice({
@@ -95,13 +101,32 @@ const profileSlice = createSlice({
         state.withdrawals[index].updatedAt = Date.now();
       }
     },
+    setLocationPermission(state, action) {
+      state.locationPermissionGranted = action.payload;
+    },
+    setProfileCompleted(state, action) {
+      state.profileCompleted = action.payload;
+    },
+    setProfilePictureTaken(state, action) {
+      state.profilePictureTaken = action.payload;
+    },
+    setKycApproved(state, action) {
+      state.kyc.isApproved = action.payload;
+    },
+    setBookingState(state, action) {
+      const { bookingId, status } = action.payload;
+      state.bookingStates[bookingId] = status;
+    },
+    setIncomingBooking(state, action) {
+      state.incomingBooking = action.payload || null; // { id, title? }
+    },
     resetProfile() {
       return initialState;
     },
   },
 });
 
-export const { setPersonalInfo, upsertKycDocument, removeKycDocument, setMPin, addBankAccount, updateBankAccount, removeBankAccount, addWithdrawal, updateWithdrawalStatus, resetProfile } =
+export const { setPersonalInfo, upsertKycDocument, removeKycDocument, setMPin, addBankAccount, updateBankAccount, removeBankAccount, addWithdrawal, updateWithdrawalStatus, setLocationPermission, setProfileCompleted, setProfilePictureTaken, setKycApproved, setBookingState, setIncomingBooking, resetProfile } =
   profileSlice.actions;
 
 export default profileSlice.reducer;

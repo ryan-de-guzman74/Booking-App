@@ -24,10 +24,11 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import { useNavigation, StackActions } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import BackButton from '../../components/BackButton';
+import BottomNav from '../../components/BottomNav';
 import { colors, getGradientColors, getGradientLocations } from '../../theme/colors';
 import DocumentPicker, { isCancel } from 'react-native-document-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
-import { upsertKycDocument } from '../../store/slices/profileSlice';
+import { upsertKycDocument, setKycApproved } from '../../store/slices/profileSlice';
 import { KYC_DOCUMENTS } from '../../config/kycDocuments';
 
 const { width: screenWidth } = Dimensions.get('window');
@@ -46,7 +47,7 @@ export default function VerifyAccountScreen() {
   const [focusedInput, setFocusedInput] = useState('type');
 
   const CARD_MIN_HEIGHT = 80;
-  const iconSize = CARD_MIN_HEIGHT * 0.5;
+  const iconSize = CARD_MIN_HEIGHT * 0.4;
 
   useEffect(() => {
     const cloned = Object.entries(storedKycDocuments || {}).reduce((acc, [id, record]) => {
@@ -59,7 +60,16 @@ export default function VerifyAccountScreen() {
       return acc;
     }, {});
     setDocumentNumbers(numberMap);
-  }, [storedKycDocuments]);
+
+    // Auto-approve KYC when all 4 documents are uploaded
+    const uploadedDocs = Object.values(storedKycDocuments || {}).filter(
+      (doc) => doc && doc.uri && doc.uri.length > 0,
+    );
+    
+    if (uploadedDocs.length === KYC_DOCUMENTS.length) {
+      dispatch(setKycApproved(true));
+    }
+  }, [storedKycDocuments, dispatch]);
 
   const renderIcon = (iconType, iconName) => {
     const iconColor = colors.primary;
@@ -230,19 +240,6 @@ export default function VerifyAccountScreen() {
     >
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.backButton}>
-        <BackButton
-          onPress={() => {
-            if (navigation.canGoBack()) {
-              navigation.dispatch(StackActions.pop(1));
-            } else {
-              navigation.navigate('KYCVerification');
-            }
-          }}
-          color={colors.textLight}
-        />
-      </View>
-
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>Verify Your Account</Text>
@@ -283,7 +280,7 @@ export default function VerifyAccountScreen() {
                       documentSelections[doc.id] && styles.uploadButtonTextSuccess,
                     ]}
                   >
-                    {documentSelections[doc.id] ? 'Replace' : 'Upload'}
+                    {documentSelections[doc.id] ? 'Change' : 'Upload'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -294,15 +291,9 @@ export default function VerifyAccountScreen() {
         <Text style={styles.footerText}>
           All information is securely stored and HIPAA-compliant.
         </Text>
-
-        <TouchableOpacity
-          style={styles.nextButton}
-          onPress={() => navigation.navigate('MainApp', { screen: 'Dashboard' })}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.nextButtonText}>Next</Text>
-        </TouchableOpacity>
       </View>
+
+      <BottomNav />
 
       <Modal
         visible={showUploadModal}
@@ -452,12 +443,12 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingTop: 60,
-    paddingBottom: 10,
+    paddingBottom: 100,
     paddingHorizontal: 30,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 30,
   },
   title: {
     fontSize: 45,
@@ -476,7 +467,7 @@ const styles = StyleSheet.create({
   },
   documentsContainer: {
     marginBottom: 20,
-    gap: 16,
+    gap: 10,
   },
   card: {
     backgroundColor: '#FFFFFF',
@@ -501,13 +492,13 @@ const styles = StyleSheet.create({
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
+    padding: 10,
     minHeight: 80,
   },
   iconContainer: {
-    marginRight: 16,
-    width: 40,
-    height: 40,
+    marginRight: 10,
+    width: 30,
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -534,11 +525,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: colors.primaryDark,
     paddingVertical: 10,
-    minWidth: 120,
+    paddingHorizontal:5
   },
   uploadButtonSuccess: {
     backgroundColor: '#ffffff',
     borderColor: colors.primary,
+    
   },
   uploadButtonText: {
     fontSize: 14,
@@ -550,8 +542,8 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   checkIcon: {
-    width: 25,
-    height: 25,
+    width: 15,
+    height: 15,
   },
   footerText: {
     fontSize: 14,
@@ -560,28 +552,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 10,
     paddingHorizontal: 5,
-  },
-  nextButton: {
-    marginTop: 24,
-    alignSelf: 'center',
-    paddingHorizontal: 36,
-    backgroundColor: colors.primaryDark,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
-    borderRadius: 12,
-    paddingVertical: 15,
-    marginHorizontal: '20%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  nextButtonText: {
-    color: colors.textLight,
-    fontSize: 18,
-    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

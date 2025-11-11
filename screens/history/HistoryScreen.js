@@ -2,20 +2,69 @@ import React from 'react';
 import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import BottomNav from '../../components/BottomNav';
 import { colors, getGradientColors, getGradientLocations } from '../../theme/colors';
 import { bookingDetailsData } from '../../data/sampleBookings';
 
-const HISTORY_BOOKINGS = bookingDetailsData.map((booking) => ({
-  id: booking.id,
-  service: booking.service,
-  startDate: booking.startDate,
-  endDate: booking.endDate,
-  startTime: booking.startTime,
-  endTime: booking.endTime,
-  amount: booking.earning,
-}));
+// History bookings - Different from BookingsScreen test data
+const HISTORY_BOOKINGS = [
+  {
+    id: 'CBID721514',
+    service: 'Companionship',
+    startDate: 'Jan 24, 2024',
+    endDate: 'Jan 24, 2024',
+    startTime: '11:50 AM',
+    endTime: '12:50 PM',
+    amount: 58.85,
+  },
+  {
+    id: 'CBID731880',
+    service: 'Medication Reminder',
+    startDate: 'Jan 24, 2024',
+    endDate: 'Jan 24, 2024',
+    startTime: '10:30 AM',
+    endTime: '11:30 AM',
+    amount: 45.4,
+  },
+  {
+    id: 'CBID745402',
+    service: 'Personal Care',
+    startDate: 'Jan 23, 2024',
+    endDate: 'Jan 23, 2024',
+    startTime: '9:00 PM',
+    endTime: '10:00 PM',
+    amount: 64.25,
+  },
+  {
+    id: 'CBID999001',
+    service: 'Physical Therapy',
+    startDate: 'Jan 20, 2024',
+    endDate: 'Jan 20, 2024',
+    startTime: '3:00 PM',
+    endTime: '4:00 PM',
+    amount: 85.00,
+  },
+  {
+    id: 'CBID999002',
+    service: 'Transportation',
+    startDate: 'Jan 18, 2024',
+    endDate: 'Jan 18, 2024',
+    startTime: '1:00 PM',
+    endTime: '2:30 PM',
+    amount: 42.50,
+  },
+  {
+    id: 'CBID999003',
+    service: 'Errands & Shopping',
+    startDate: 'Jan 15, 2024',
+    endDate: 'Jan 15, 2024',
+    startTime: '11:00 AM',
+    endTime: '12:00 PM',
+    amount: 38.75,
+  },
+];
 
 const getDateParts = (dateString) => {
   const [month, dayWithComma] = dateString.split(' ');
@@ -23,8 +72,117 @@ const getDateParts = (dateString) => {
   return { month, day };
 };
 
+const STATUS_META = {
+  completed: { label: 'Completed', color: '#2E7D32' },
+  failed: { label: 'Failed', color: '#D32F2F' },
+  rejected: { label: 'Rejected', color: '#D32F2F' },
+};
+
+const ONGOING_STATES = new Set([
+  'on_the_way',
+  'arrived',
+  'arrival_notified',
+  'awaiting_start',
+  'ready_to_start',
+  'otp_start',
+  'in_progress',
+  'medical_note',
+  'otp_complete',
+]);
+
+const parseDateTime = (dateString, timeString) => {
+  if (!dateString || !timeString) {
+    return null;
+  }
+
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const [timePart, period] = timeString.split(' ');
+  if (!timePart || !period) {
+    return date;
+  }
+
+  const [hours, minutes] = timePart.split(':');
+  let hourValue = parseInt(hours, 10);
+  const minuteValue = parseInt(minutes, 10);
+
+  if (period === 'PM' && hourValue !== 12) {
+    hourValue += 12;
+  }
+  if (period === 'AM' && hourValue === 12) {
+    hourValue = 0;
+  }
+
+  date.setHours(hourValue, Number.isNaN(minuteValue) ? 0 : minuteValue, 0, 0);
+  return date;
+};
+
+const deriveStatus = (booking, bookingStates) => {
+  const storedStatus = bookingStates[booking.id];
+  if (storedStatus && STATUS_META[storedStatus]) {
+    return STATUS_META[storedStatus];
+  }
+
+  if (storedStatus && ONGOING_STATES.has(storedStatus)) {
+    return { label: 'Ongoing', color: '#FB8C00' };
+  }
+
+  const endDateTime = parseDateTime(booking.endDate, booking.endTime);
+  const now = new Date();
+
+  if (endDateTime && now > endDateTime) {
+    return STATUS_META.failed;
+  }
+
+  return storedStatus ? { label: storedStatus, color: '#9E9E9E' } : { label: 'Ongoing', color: '#FB8C00' };
+};
+
+// Helper function to parse date string (e.g., "Jan 24, 2024") to Date object for sorting
+const parseDateForSort = (dateString) => {
+  const monthMap = {
+    'Jan': 0, 'Feb': 1, 'Mar': 2, 'Apr': 3, 'May': 4, 'Jun': 5,
+    'Jul': 6, 'Aug': 7, 'Sep': 8, 'Oct': 9, 'Nov': 10, 'Dec': 11,
+  };
+  const parts = dateString.split(' ');
+  const month = monthMap[parts[0]] || 0;
+  const day = parseInt(parts[1].replace(',', ''), 10);
+  const year = parseInt(parts[2], 10);
+  return new Date(year, month, day);
+};
+
 export default function HistoryScreen() {
   const navigation = useNavigation();
+  const bookingStates = useSelector((state) => state.profile.bookingStates || {});
+  
+  // Include confirmed bookings from BookingsScreen (those with booking states)
+  const confirmedBookings = Object.keys(bookingStates).map((bookingId) => {
+    const booking = bookingDetailsData.find((b) => b.id === bookingId);
+    if (booking) {
+      return {
+        id: booking.id,
+        service: booking.service,
+        startDate: booking.startDate,
+        endDate: booking.endDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        amount: booking.earning,
+      };
+    }
+    return null;
+  }).filter(Boolean);
+  
+  // Combine static history bookings with confirmed bookings, avoiding duplicates, sorted by date (latest first)
+  const allHistoryBookings = [
+    ...HISTORY_BOOKINGS,
+    ...confirmedBookings.filter((cb) => !HISTORY_BOOKINGS.find((hb) => hb.id === cb.id)),
+  ].sort((a, b) => {
+    const dateA = parseDateForSort(a.startDate);
+    const dateB = parseDateForSort(b.startDate);
+    return dateB - dateA; // Descending order (latest first)
+  });
 
   return (
     <LinearGradient
@@ -49,7 +207,8 @@ export default function HistoryScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {HISTORY_BOOKINGS.map((booking) => {
+            {allHistoryBookings.map((booking) => {
+              const statusMeta = deriveStatus(booking, bookingStates);
               const { month, day } = getDateParts(booking.startDate);
               const isSameDay = booking.startDate === booking.endDate;
               return (
@@ -85,6 +244,7 @@ export default function HistoryScreen() {
                       <View style={styles.amountBadge}>
                         <Text style={styles.amountText}>{`$${booking.amount.toFixed(2)}`}</Text>
                       </View>
+                      <Text style={[styles.statusText, { color: statusMeta.color }]}>{statusMeta.label}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -137,7 +297,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingVertical: 24,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     marginTop: 8,
   },
   scrollContent: {
@@ -153,7 +313,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 18,
-    paddingHorizontal: 16,
+    paddingHorizontal: 10,
+    marginHorizontal: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.1,
@@ -161,13 +322,13 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   dateBadge: {
-    width: 70,
+    width: 50,
     borderRadius: 16,
     backgroundColor: colors.textDark,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    marginRight: 14,
+    paddingVertical: 10,
+    marginRight: 10,
   },
   dateMonth: {
     fontSize: 16,
@@ -176,7 +337,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   dateDay: {
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: '800',
     color: colors.textLight,
   },
@@ -224,6 +385,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#2E7D32',
+  },
+  statusText: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
   },
   statusIndicator: {
     position: 'absolute',

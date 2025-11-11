@@ -25,14 +25,29 @@ export default function PersonalDetailsScreen() {
   const navigation = useNavigation();
   const personalInfo = useSelector((state) => state.profile.personalInfo);
   const kycDocuments = useSelector((state) => state.profile.kyc.documents);
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
 
-  const remainingVerifications = useMemo(() => {
-    const approvedCount = Object.values(kycDocuments || {}).filter(
-      (doc) => doc?.status === 'approved',
+  // Check if all 4 documents are uploaded (regardless of status)
+  const uploadedCount = useMemo(() => {
+    return Object.values(kycDocuments || {}).filter(
+      (doc) => doc && doc.uri && doc.uri.length > 0,
     ).length;
-    const totalNeeded = KYC_DOCUMENTS.length;
-    return Math.max(totalNeeded - approvedCount, 0);
   }, [kycDocuments]);
+
+  const totalDocuments = KYC_DOCUMENTS.length;
+
+  // Get KYC status message
+  const getKycStatusMessage = useMemo(() => {
+    if (kycApproved) {
+      return 'KYC verification passed';
+    }
+    if (uploadedCount === totalDocuments) {
+      return 'All documents uploaded';
+    }
+    return `${uploadedCount}/${totalDocuments} documents uploaded`;
+  }, [kycApproved, uploadedCount, totalDocuments]);
+
+  const isKycComplete = kycApproved || uploadedCount === totalDocuments;
 
   const renderValue = (row) => {
     const value = personalInfo[row.key] || personalInfo[row.fallbackKey] || '';
@@ -59,7 +74,13 @@ export default function PersonalDetailsScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              // Always navigate to Profile screen regardless of history
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainApp', params: { screen: 'Profile' } }],
+              });
+            }}
             activeOpacity={0.85}
           >
             <Ionicons name="arrow-back" size={24} color={colors.textLight} />
@@ -94,14 +115,11 @@ export default function PersonalDetailsScreen() {
           </View>
 
           <View style={styles.card}>
-            <View style={styles.row}>
-              <View>
-                <Text style={styles.rowLabel}>Update KYC</Text>
-                <Text style={styles.helperText}>
-                  {remainingVerifications === 0
-                    ? 'All verifications completed'
-                    : `${remainingVerifications} verification${remainingVerifications > 1 ? 's' : ''
-                    } remaining`}
+            <View style={styles.kycRow}>
+              <View style={styles.kycInfoContainer}>
+                <Text style={[styles.rowLabel, isKycComplete && styles.rowLabelActive]}>Update KYC</Text>
+                <Text style={[styles.helperText, isKycComplete && styles.helperTextSuccess]}>
+                  {getKycStatusMessage}
                 </Text>
               </View>
               <TouchableOpacity
@@ -203,6 +221,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E5E7EB',
   },
+  kycRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  kycInfoContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
   rowLabel: {
     fontSize: 14,
     fontWeight: '600',
@@ -211,6 +239,9 @@ const styles = StyleSheet.create({
   },
   rowLabelFilled: {
     color: colors.textPrimary,
+  },
+  rowLabelActive: {
+    color: colors.primary,
   },
   rowValue: {
     fontSize: 14,
@@ -227,10 +258,15 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 4,
   },
+  helperTextSuccess: {
+    color: colors.primary,
+    fontWeight: '600',
+  },
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    flexShrink: 0,
   },
   viewButtonText: {
     fontSize: 14,
