@@ -4,6 +4,7 @@ import {
   Animated,
   Dimensions,
   Image,
+  Keyboard,
   Linking,
   PanResponder,
   RefreshControl,
@@ -73,9 +74,9 @@ export default function BookingDetailsScreen() {
     return id ? state.profile.bookingStates[id] : null;
   });
 
-  // State management - initialize from Redux if available
+  // State management - initialize from Redux if available, or null for initial state
   const [bookingStateLocal, setBookingStateLocal] = useState(
-    storedBookingState || BOOKING_STATES.ON_THE_WAY
+    storedBookingState || null
   );
 
   // Sync local state with Redux when stored state changes
@@ -101,10 +102,22 @@ export default function BookingDetailsScreen() {
   const [otpDigits, setOtpDigits] = useState(Array(OTP_LENGTH).fill(''));
   const [medicalNoteVisible, setMedicalNoteVisible] = useState(false);
   const [medicalNote, setMedicalNote] = useState('');
+  const [bloodPressureUpper, setBloodPressureUpper] = useState('');
+  const [bloodPressureLower, setBloodPressureLower] = useState('');
+  const [oxygenLevel, setOxygenLevel] = useState('');
+  const [ecgReading, setEcgReading] = useState('');
+  const [patientHealthInfo, setPatientHealthInfo] = useState('');
+  const [treatmentDetails, setTreatmentDetails] = useState('');
+  const [otherCareDetails, setOtherCareDetails] = useState('');
   const [notificationVisible, setNotificationVisible] = useState(false);
+  const [notificationTitle, setNotificationTitle] = useState('');
+  const [notificationMessage, setNotificationMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showJobStatusBanner, setShowJobStatusBanner] = useState(false);
+  const [showCheckButton, setShowCheckButton] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const personalInfo = useSelector((state) => state.profile.personalInfo);
 
   const translateX = useRef(new Animated.Value(0)).current;
   const sliderWidthRef = useRef(SLIDER_INITIAL_WIDTH);
@@ -208,6 +221,55 @@ export default function BookingDetailsScreen() {
     return undefined;
   }, [otpVisible]);
 
+  // Handle keyboard show/hide for Medical Note Modal
+  const keyboardOffset = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!medicalNoteVisible) {
+      setKeyboardHeight(0);
+      Animated.timing(keyboardOffset, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        const height = e.endCoordinates.height;
+        setKeyboardHeight(height);
+        // Move modal up just enough so Continue button stays above keyboard
+        // Use a smaller, more conservative offset to prevent modal from rising too much
+        // The modal should only move up enough to keep the button visible, not the full keyboard height
+        const offset = Math.min(height * 0.2, 100); // 20% of keyboard height, max 100px
+        Animated.timing(keyboardOffset, {
+          toValue: -offset,
+          duration: Platform.OS === 'ios' ? e.duration || 250 : 250,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+        Animated.timing(keyboardOffset, {
+          toValue: 0,
+          duration: 250,
+          useNativeDriver: true,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener.remove();
+      keyboardWillHideListener.remove();
+    };
+  }, [medicalNoteVisible, keyboardOffset]);
+
   const resetSlider = useCallback(() => {
     Animated.timing(translateX, {
       toValue: 0,
@@ -259,29 +321,116 @@ export default function BookingDetailsScreen() {
 
     if (otpType === 'start') {
       setBookingState(BOOKING_STATES.IN_PROGRESS);
-      Alert.alert('Job Started', 'You have successfully started the job.', [{ text: 'OK' }]);
+      // Show "You are starting your job" banner for 2 seconds
+      setShowJobStatusBanner(true);
+      setTimeout(() => {
+        setShowJobStatusBanner(false);
+      }, 2000);
     } else if (otpType === 'complete') {
-      setBookingState(BOOKING_STATES.COMPLETED);
-      Alert.alert('Booking Completed', 'This booking has been marked as completed.', [
-        {
-          text: 'OK',
-          onPress: () => navigation.goBack(),
-        },
-      ]);
+      // Show notification first
+      const userName = personalInfo.fullName || booking.userName;
+      setNotificationTitle(`${userName} Caregiver`);
+      setNotificationMessage('You finished the job successfully for the day!');
+      setNotificationVisible(true);
+      Animated.sequence([
+        Animated.timing(notificationOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.delay(2000),
+        Animated.timing(notificationOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        setNotificationVisible(false);
+        setBookingState(BOOKING_STATES.COMPLETED);
+        // Navigate to HistoryScreen after 1 second
+        setTimeout(() => {
+          navigation.navigate('MainApp', { screen: 'History' });
+        }, 1000);
+      });
     }
-  }, [closeOtpModal, otpType, otpDigits, navigation]);
+  }, [closeOtpModal, otpType, otpDigits, navigation, personalInfo, booking]);
 
   const handleSliderCompleteRef = useRef();
   handleSliderCompleteRef.current = () => {
+    // If no state is set (initial), sliding "Slide to make on the way" should mark as "on the way"
+    if (!bookingState) {
+      setShowCheckButton(true);
+      setTimeout(() => {
+        setShowCheckButton(false);
+        setBookingState(BOOKING_STATES.ON_THE_WAY);
+        // Show notification
+        const userName = personalInfo.fullName || booking.userName;
+        setNotificationTitle(`${userName} Caregiver`);
+        setNotificationMessage('The job mark as "On the way" successfully');
+        setNotificationVisible(true);
+        Animated.sequence([
+          Animated.timing(notificationOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.delay(2000),
+          Animated.timing(notificationOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start(() => {
+          setNotificationVisible(false);
+        });
+      }, 1000);
+      return;
+    }
+
     switch (bookingState) {
       case BOOKING_STATES.ON_THE_WAY:
-        setBookingState(BOOKING_STATES.ARRIVED);
+        // Show check button for 1 second, then show notification and transition
+        setShowCheckButton(true);
+        setTimeout(() => {
+          setShowCheckButton(false);
+          setBookingState(BOOKING_STATES.ARRIVED);
+          // Show notification
+          const userName = personalInfo.fullName || booking.userName;
+          setNotificationTitle(`${userName} Caregiver`);
+          setNotificationMessage('The job mark as "Arrived" successfully!');
+          setNotificationVisible(true);
+          Animated.sequence([
+            Animated.timing(notificationOpacity, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+            Animated.delay(2000),
+            Animated.timing(notificationOpacity, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            setNotificationVisible(false);
+            // After notification, show "Awaiting to start job..." for 3 seconds
+            setBookingState(BOOKING_STATES.AWAITING_START);
+            setTimeout(() => {
+              setBookingState(BOOKING_STATES.READY_TO_START);
+            }, 3000);
+          });
+        }, 1000);
         break;
       case BOOKING_STATES.ARRIVED:
-        setBookingState(BOOKING_STATES.ARRIVAL_NOTIFIED);
+        // This state should not be reached via slider, but handle it just in case
         break;
       case BOOKING_STATES.READY_TO_START:
-        openOtpModal('start');
+        // Show check button, then open OTP modal
+        setShowCheckButton(true);
+        setTimeout(() => {
+          setShowCheckButton(false);
+          openOtpModal('start');
+        }, 1000);
         break;
       default:
         break;
@@ -360,27 +509,93 @@ export default function BookingDetailsScreen() {
   }, []);
 
   const handleMedicalNoteSubmit = useCallback(() => {
-    if (!medicalNote.trim()) {
-      Alert.alert('Empty Note', 'Please enter a medical note.');
+    // Combine all medical record fields into a single note
+    const medicalRecordData = {
+      bloodPressure: bloodPressureUpper && bloodPressureLower ? `${bloodPressureUpper}-${bloodPressureLower}` : '',
+      oxygenLevel,
+      ecgReading,
+      patientHealthInfo,
+      treatmentDetails,
+      otherCareDetails,
+    };
+
+    // Create a formatted medical note from all fields
+    const formattedNote = Object.entries(medicalRecordData)
+      .filter(([_, value]) => value && value.trim())
+      .map(([key, value]) => {
+        const label = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, (str) => str.toUpperCase())
+          .replace('Blood Pressure', 'Blood Pressure')
+          .replace('Oxygen Level', 'Oxygen Level')
+          .replace('Ecg Reading', 'ECG (bpm)')
+          .replace('Patient Health Info', 'Patient Health Information')
+          .replace('Treatment Details', 'Treatment Details')
+          .replace('Other Care Details', 'Other Care Details');
+        return `${label}: ${value}`;
+      })
+      .join('\n');
+
+    if (!formattedNote.trim()) {
+      Alert.alert('Empty Record', 'Please enter at least one medical record field.');
       return;
     }
+
+    setMedicalNote(formattedNote);
     setMedicalNoteVisible(false);
-    setMedicalNote('');
-    openOtpModal('complete');
-  }, [medicalNote, openOtpModal]);
+    // Reset all fields
+    setBloodPressureUpper('');
+    setBloodPressureLower('');
+    setOxygenLevel('');
+    setEcgReading('');
+    setPatientHealthInfo('');
+    setTreatmentDetails('');
+    setOtherCareDetails('');
+
+    // Show orange check mark and notification
+    setShowCheckButton(true);
+    const userName = personalInfo.fullName || booking.userName;
+    setNotificationTitle(`${userName} Caregiver`);
+    setNotificationMessage('Medical Note Added Successfully!');
+    setNotificationVisible(true);
+
+    Animated.sequence([
+      Animated.timing(notificationOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.delay(2000),
+      Animated.timing(notificationOpacity, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setNotificationVisible(false);
+      setShowCheckButton(false);
+      // After few seconds, show OTP modal
+      setTimeout(() => {
+        openOtpModal('complete');
+      }, 2000);
+    });
+  }, [bloodPressureUpper, bloodPressureLower, oxygenLevel, ecgReading, patientHealthInfo, treatmentDetails, otherCareDetails, openOtpModal, personalInfo, booking]);
 
   // Get slider button configuration based on state
   const getSliderConfig = useCallback(() => {
+    // If no state is set (initial), show initial "Slide to make on the way"
+    if (!bookingState) {
+      return {
+        label: 'Slide to make on the way',
+        trackColor: '#4CAF50',
+        knobColor: colors.primaryDark,
+        icon: 'navigation',
+        enabled: true,
+      };
+    }
+
     switch (bookingState) {
       case BOOKING_STATES.ON_THE_WAY:
-        return {
-          label: 'Slide to make on the way',
-          trackColor: '#4CAF50',
-          knobColor: colors.primaryDark,
-          icon: 'navigation',
-          enabled: true,
-        };
-      case BOOKING_STATES.ARRIVED:
         return {
           label: 'Slide to Mark as Arrived',
           trackColor: '#4CAF50',
@@ -388,6 +603,8 @@ export default function BookingDetailsScreen() {
           icon: 'check-circle',
           enabled: true,
         };
+      case BOOKING_STATES.ARRIVED:
+      case BOOKING_STATES.ARRIVAL_NOTIFIED:
       case BOOKING_STATES.AWAITING_START:
         return {
           label: 'AWAITING TO START JOB...',
@@ -441,14 +658,21 @@ export default function BookingDetailsScreen() {
 
           <TouchableOpacity style={styles.mapContainer} onPress={handleMapPress} activeOpacity={0.9}>
             <Image source={{ uri: booking.mapImage }} style={styles.mapImage} />
-            <TouchableOpacity
-              style={styles.trackLocationButton}
-              onPress={handleTrackLocation}
-              activeOpacity={0.85}
-            >
-              <MaterialIcons name="my-location" size={18} color="#FFFFFF" />
-              <Text style={styles.trackLocationText}>Track Location</Text>
-            </TouchableOpacity>
+            {(bookingState === BOOKING_STATES.ON_THE_WAY ||
+              bookingState === BOOKING_STATES.ARRIVED ||
+              bookingState === BOOKING_STATES.ARRIVAL_NOTIFIED ||
+              bookingState === BOOKING_STATES.AWAITING_START ||
+              bookingState === BOOKING_STATES.READY_TO_START ||
+              bookingState === BOOKING_STATES.OTP_START) && (
+                <TouchableOpacity
+                  style={styles.trackLocationButton}
+                  onPress={handleTrackLocation}
+                  activeOpacity={0.85}
+                >
+                  <MaterialIcons name="my-location" size={18} color="#FFFFFF" />
+                  <Text style={styles.trackLocationText}>Track Location</Text>
+                </TouchableOpacity>
+              )}
           </TouchableOpacity>
 
           <View style={styles.card}>
@@ -503,27 +727,80 @@ export default function BookingDetailsScreen() {
               </View>
             </View>
             <Text style={styles.earningHint}>{`For this booking you will get ${formatCurrency(booking.earning)}`}</Text>
+
+            {/* Slider Button, Notification, or Action Buttons - Inside Care Schedule Card */}
+            {bookingState === BOOKING_STATES.COMPLETED ? (
+              <View style={styles.sliderWrapperInCard}>
+                <View style={styles.completedCard}>
+                  <View style={styles.completedIconWrapper}>
+                    <MaterialIcons name="check-circle" size={32} color="#2E7D32" />
+                  </View>
+                  <View style={styles.completedTextGroup}>
+                    <Text style={styles.completedTitle}>Booking Completed</Text>
+                    <Text style={styles.completedSubtitle}>Great job! This visit is closed.</Text>
+                  </View>
+                  <View style={styles.completedAmountBadge}>
+                    <Text style={styles.completedAmountText}>{formatCurrency(booking.earning)}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : showCheckButton && bookingState === BOOKING_STATES.IN_PROGRESS ? (
+              <View style={styles.sliderWrapperInCard}>
+                <View style={[styles.sliderTrack, { backgroundColor: '#FF9800' }]}>
+                  <View style={styles.checkButtonContainer}>
+                    <MaterialIcons name="check" size={32} color="#FFFFFF" />
+                  </View>
+                </View>
+              </View>
+            ) : showCheckButton ? (
+              <View style={styles.sliderWrapperInCard}>
+                <View style={[styles.sliderTrack, { backgroundColor: '#4CAF50' }]}>
+                  <View style={styles.checkButtonContainer}>
+                    <MaterialIcons name="check" size={32} color="#FFFFFF" />
+                  </View>
+                </View>
+              </View>
+            ) : bookingState === BOOKING_STATES.IN_PROGRESS ? (
+              <View style={styles.sliderWrapperInCard}>
+                <View style={styles.actionButtonsRow}>
+                  <TouchableOpacity style={styles.careInProgressButton} activeOpacity={0.85}>
+                    <Text style={styles.careInProgressText}>CARE UNDER PROGRESS...</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.addMedicalNoteButton} onPress={handleAddMedicalNote} activeOpacity={0.85}>
+                    <Text style={styles.addMedicalNoteText}>ADD MEDICAL NOTE</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : sliderConfig ? (
+              <View style={styles.sliderWrapperInCard}>
+                <View
+                  style={[styles.sliderTrack, { backgroundColor: sliderConfig.trackColor }]}
+                  onLayout={handleSliderLayout}
+                >
+                  <Text style={styles.sliderLabel} pointerEvents="none">
+                    {sliderConfig.label}
+                  </Text>
+                  {sliderConfig.enabled && (
+                    <Animated.View
+                      {...sliderResponder.panHandlers}
+                      style={[
+                        styles.sliderKnob,
+                        { backgroundColor: sliderConfig.knobColor },
+                        { transform: [{ translateX }] },
+                      ]}
+                    >
+                      <MaterialIcons name={sliderConfig.icon} size={26} color="#FFFFFF" />
+                    </Animated.View>
+                  )}
+                </View>
+              </View>
+            ) : null}
           </View>
         </ScrollView>
 
-        {/* Slider Button, Notification, or Action Buttons */}
-        {bookingState === BOOKING_STATES.COMPLETED ? (
-          <View style={styles.sliderWrapper}>
-            <View style={styles.completedCard}>
-              <View style={styles.completedIconWrapper}>
-                <MaterialIcons name="check-circle" size={32} color="#2E7D32" />
-              </View>
-              <View style={styles.completedTextGroup}>
-                <Text style={styles.completedTitle}>Booking Completed</Text>
-                <Text style={styles.completedSubtitle}>Great job! This visit is closed.</Text>
-              </View>
-              <View style={styles.completedAmountBadge}>
-                <Text style={styles.completedAmountText}>{formatCurrency(booking.earning)}</Text>
-              </View>
-            </View>
-          </View>
-        ) : notificationVisible ? (
-          <View style={styles.sliderWrapper}>
+        {/* Notifications - Independent from Care Schedule */}
+        {notificationVisible && bookingState !== BOOKING_STATES.COMPLETED && (
+          <View style={styles.notificationContainer}>
             <Animated.View
               style={[
                 styles.notificationInSliderPosition,
@@ -535,53 +812,39 @@ export default function BookingDetailsScreen() {
             >
               <MaterialIcons name="info" size={24} color="#FFFFFF" />
               <View style={styles.notificationTextContainer}>
-                <Text style={styles.notificationTitleWhite}>{booking.userName} Caregiver</Text>
-                <Text style={styles.notificationMessageWhite}>The job mark as arrived successfully!</Text>
+                <Text style={styles.notificationTitleWhite}>{notificationTitle}</Text>
+                <Text style={styles.notificationMessageWhite}>{notificationMessage}</Text>
               </View>
             </Animated.View>
           </View>
-        ) : sliderConfig ? (
-          <View style={styles.sliderWrapper}>
-            <View
-              style={[styles.sliderTrack, { backgroundColor: sliderConfig.trackColor }]}
-              onLayout={handleSliderLayout}
-            >
-              <Text style={styles.sliderLabel} pointerEvents="none">
-                {sliderConfig.label}
-              </Text>
-              {sliderConfig.enabled && (
-                <Animated.View
-                  {...sliderResponder.panHandlers}
-                  style={[
-                    styles.sliderKnob,
-                    { backgroundColor: sliderConfig.knobColor },
-                    { transform: [{ translateX }] },
-                  ]}
-                >
-                  <MaterialIcons name={sliderConfig.icon} size={26} color="#FFFFFF" />
-                </Animated.View>
-              )}
-            </View>
-          </View>
-        ) : null}
+        )}
 
-        {bookingState === BOOKING_STATES.IN_PROGRESS && (
-          <>
-            {showJobStatusBanner ? (
-              <View style={styles.jobStatusBanner}>
-                <Text style={styles.jobStatusText}>You are starting your job</Text>
+        {/* Job Status Banner */}
+        {showJobStatusBanner && (
+          <View style={styles.jobStatusBanner}>
+            <Text style={styles.jobStatusText}>You are starting your job.</Text>
+          </View>
+        )}
+
+        {/* Bottom Notification for completion */}
+        {bookingState === BOOKING_STATES.COMPLETED && notificationVisible && (
+          <View style={styles.bottomNotificationContainer}>
+            <Animated.View
+              style={[
+                styles.bottomNotification,
+                {
+                  opacity: notificationOpacity,
+                },
+              ]}
+              pointerEvents="none"
+            >
+              <MaterialIcons name="info" size={24} color="#FFFFFF" />
+              <View style={styles.bottomNotificationTextContainer}>
+                <Text style={styles.bottomNotificationTitle}>{notificationTitle}</Text>
+                <Text style={styles.bottomNotificationMessage}>{notificationMessage}</Text>
               </View>
-            ) : (
-              <View style={styles.actionButtonsContainer}>
-                <TouchableOpacity style={styles.progressButton} activeOpacity={0.85}>
-                  <Text style={styles.progressButtonText}>CARE UNDER PROGRESS...</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.medicalNoteButton} onPress={handleAddMedicalNote} activeOpacity={0.85}>
-                  <Text style={styles.medicalNoteButtonText}>ADD MEDICAL NOTE</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
+            </Animated.View>
+          </View>
         )}
 
         {/* OTP Modal */}
@@ -624,38 +887,149 @@ export default function BookingDetailsScreen() {
         {/* Medical Note Modal */}
         <Modal visible={medicalNoteVisible} transparent animationType="fade" onRequestClose={() => setMedicalNoteVisible(false)}>
           <KeyboardAvoidingView
-            style={styles.otpOverlay}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.medicalNoteOverlay}
+            keyboardVerticalOffset={0}
           >
-            <View style={styles.medicalNoteCard}>
-              <Text style={styles.medicalNoteTitle}>Add Medical Note</Text>
-              <TextInput
-                style={styles.medicalNoteInput}
-                placeholder="Enter activities during the visit (e.g., Blood Pressure measuring, Meal Preparing, etc.)"
-                placeholderTextColor={colors.textMuted}
-                multiline
-                numberOfLines={6}
-                value={medicalNote}
-                onChangeText={setMedicalNote}
-                textAlignVertical="top"
-              />
-              <View style={styles.medicalNoteButtons}>
+            <Animated.View
+              style={[
+                styles.medicalNoteCardContainer,
+                {
+                  transform: [
+                    {
+                      translateY: keyboardOffset,
+                    },
+                  ],
+                },
+              ]}
+            >
+              <View style={[styles.medicalNoteCard, { maxHeight: keyboardHeight > 0 ? screenHeight - keyboardHeight - 60 : screenHeight * 0.75 }]}>
+                <View style={styles.medicalNoteHeader}>
+                  <Text style={styles.medicalNoteTitle}>Add Medical Record Log</Text>
+                  <TouchableOpacity
+                    style={styles.medicalNoteCloseButton}
+                    onPress={() => {
+                      setMedicalNoteVisible(false);
+                      setBloodPressureUpper('');
+                      setBloodPressureLower('');
+                      setOxygenLevel('');
+                      setEcgReading('');
+                      setPatientHealthInfo('');
+                      setTreatmentDetails('');
+                      setOtherCareDetails('');
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="close" size={20} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.medicalNoteScrollView} showsVerticalScrollIndicator={false}>
+                  {/* Blood Pressure */}
+                  <View style={styles.medicalNoteFieldGroup}>
+                    <Text style={styles.medicalNoteLabel}>Blood Pressure</Text>
+                    <View style={styles.bloodPressureRow}>
+                      <TextInput
+                        style={[styles.medicalNoteInput, styles.bloodPressureInput]}
+                        placeholder="Upper value"
+                        placeholderTextColor={colors.textMuted}
+                        value={bloodPressureUpper}
+                        onChangeText={setBloodPressureUpper}
+                        keyboardType="numeric"
+                      />
+                      <Text style={styles.bloodPressureSeparator}>-</Text>
+                      <TextInput
+                        style={[styles.medicalNoteInput, styles.bloodPressureInput]}
+                        placeholder="Lower value"
+                        placeholderTextColor={colors.textMuted}
+                        value={bloodPressureLower}
+                        onChangeText={setBloodPressureLower}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Oxygen Level */}
+                  <View style={styles.medicalNoteFieldGroup}>
+                    <Text style={styles.medicalNoteLabel}>Oxygen Level</Text>
+                    <TextInput
+                      style={styles.medicalNoteInput}
+                      placeholder="Enter oxygen level of patient"
+                      placeholderTextColor={colors.textMuted}
+                      value={oxygenLevel}
+                      onChangeText={setOxygenLevel}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  {/* ECG */}
+                  <View style={styles.medicalNoteFieldGroup}>
+                    <Text style={styles.medicalNoteLabel}>ECG (in bpm)</Text>
+                    <TextInput
+                      style={styles.medicalNoteInput}
+                      placeholder="Enter ECG reading"
+                      placeholderTextColor={colors.textMuted}
+                      value={ecgReading}
+                      onChangeText={setEcgReading}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  {/* Patient's health information */}
+                  <View style={styles.medicalNoteFieldGroup}>
+                    <Text style={styles.medicalNoteLabel}>Patient's health information</Text>
+                    <TextInput
+                      style={[styles.medicalNoteInput, styles.medicalNoteTextArea]}
+                      placeholder="Enter patient's health information here"
+                      placeholderTextColor={colors.textMuted}
+                      value={patientHealthInfo}
+                      onChangeText={setPatientHealthInfo}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                    />
+                  </View>
+
+                  {/* Treatment details */}
+                  <View style={styles.medicalNoteFieldGroup}>
+                    <Text style={styles.medicalNoteLabel}>Treatment details</Text>
+                    <TextInput
+                      style={[styles.medicalNoteInput, styles.medicalNoteTextArea]}
+                      placeholder="Enter treatment details here"
+                      placeholderTextColor={colors.textMuted}
+                      value={treatmentDetails}
+                      onChangeText={setTreatmentDetails}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                    />
+                  </View>
+
+                  {/* Other care details */}
+                  <View style={styles.medicalNoteFieldGroup}>
+                    <Text style={styles.medicalNoteLabel}>Other care details</Text>
+                    <TextInput
+                      style={[styles.medicalNoteInput, styles.medicalNoteTextArea]}
+                      placeholder="Enter other care details here"
+                      placeholderTextColor={colors.textMuted}
+                      value={otherCareDetails}
+                      onChangeText={setOtherCareDetails}
+                      multiline
+                      numberOfLines={3}
+                      textAlignVertical="top"
+                    />
+                  </View>
+                </ScrollView>
+
                 <TouchableOpacity
-                  style={styles.medicalNoteCancelButton}
-                  onPress={() => {
-                    setMedicalNoteVisible(false);
-                    setMedicalNote('');
-                  }}
+                  style={styles.medicalNoteContinueButton}
+                  onPress={handleMedicalNoteSubmit}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.medicalNoteCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.medicalNoteOkButton} onPress={handleMedicalNoteSubmit} activeOpacity={0.85}>
-                  <Text style={styles.medicalNoteOkText}>OK</Text>
+                  <Text style={styles.medicalNoteContinueText}>Continue</Text>
                 </TouchableOpacity>
               </View>
-            </View>
+            </Animated.View>
           </KeyboardAvoidingView>
         </Modal>
       </SafeAreaView>
@@ -885,6 +1259,82 @@ const styles = StyleSheet.create({
     paddingHorizontal: TRACK_HORIZONTAL_MARGIN,
     paddingBottom: 24,
   },
+  sliderWrapperInCard: {
+    marginTop: 16,
+    paddingTop: 0,
+  },
+  checkButtonContainer: {
+    width: '100%',
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 0,
+    marginTop: 16,
+  },
+  careInProgressButton: {
+    flex: 1,
+    backgroundColor: '#FF9800',
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  careInProgressText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  addMedicalNoteButton: {
+    flex: 1,
+    backgroundColor: '#4CAF50',
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addMedicalNoteText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  bottomNotificationContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 15,
+    paddingBottom: 15,
+    zIndex: 10,
+  },
+  bottomNotification: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 0,
+    padding: 36,
+    alignItems: 'center',
+    gap: 12,
+  },
+  bottomNotificationTextContainer: {
+    flex: 1,
+  },
+  bottomNotificationTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  bottomNotificationMessage: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    opacity: 0.9,
+  },
   sliderTrack: {
     height: 64,
     borderRadius: 32,
@@ -949,17 +1399,16 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textTransform: 'uppercase',
   },
+  notificationContainer: {
+    paddingHorizontal: TRACK_HORIZONTAL_MARGIN,
+    paddingBottom: 0,
+  },
   notificationInSliderPosition: {
     flexDirection: 'row',
     backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    padding: 20,
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
     gap: 12,
     minHeight: 64,
     justifyContent: 'center',
@@ -1042,68 +1491,112 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  medicalNoteOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  medicalNoteCardContainer: {
+    width: '100%',
+    maxWidth: screenWidth * 0.9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   medicalNoteCard: {
     width: '100%',
-    maxWidth: 400,
+    height: screenHeight * 0.5,
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingVertical: 28,
-    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.12,
     shadowRadius: 12,
     elevation: 8,
+    justifyContent: 'space-between',
+  },
+  medicalNoteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   medicalNoteTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.textPrimary,
-    marginBottom: 16,
+    flex: 1,
+  },
+  medicalNoteCloseButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medicalNoteScrollView: {
+    flexGrow: 1,
+    flexShrink: 1,
+  },
+  medicalNoteFieldGroup: {
+    marginBottom: 10,
+  },
+  medicalNoteLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: 2,
   },
   medicalNoteInput: {
     width: '100%',
-    minHeight: 120,
+    minHeight: 28,
     borderWidth: 1,
-    borderColor: colors.borderDivider,
-    borderRadius: 12,
-    padding: 12,
+    borderColor: '#E0E0E0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     fontSize: 14,
     color: colors.textPrimary,
-    backgroundColor: '#F2F6F4',
-    marginBottom: 20,
+    backgroundColor: '#FFFFFF',
   },
-  medicalNoteButtons: {
+  medicalNoteTextArea: {
+    minHeight: 80,
+    paddingTop: 12,
+  },
+  bloodPressureRow: {
     flexDirection: 'row',
-    gap: 12,
-  },
-  medicalNoteCancelButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: colors.borderDivider,
-    borderRadius: 10,
-    paddingVertical: 12,
     alignItems: 'center',
+    gap: 8,
   },
-  medicalNoteCancelText: {
-    color: colors.textSecondary,
+  bloodPressureInput: {
+    flex: 1,
+  },
+  bloodPressureSeparator: {
     fontSize: 16,
     fontWeight: '600',
+    color: colors.textPrimary,
+    marginHorizontal: 4,
   },
-  medicalNoteOkButton: {
-    flex: 1,
+  medicalNoteContinueButton: {
+    width: '100%',
     backgroundColor: '#4CAF50',
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
   },
-  medicalNoteOkText: {
+  medicalNoteContinueText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
   jobStatusBanner: {
-    marginTop: screenHeight * 0.02,
+    marginTop: 0,
     paddingVertical: screenHeight * 0.02,
     backgroundColor: '#4CAF50',
     alignItems: 'center',
