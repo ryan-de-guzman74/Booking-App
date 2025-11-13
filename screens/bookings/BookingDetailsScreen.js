@@ -327,6 +327,8 @@ export default function BookingDetailsScreen() {
         setShowJobStatusBanner(false);
       }, 2000);
     } else if (otpType === 'complete') {
+      // Hide the orange check button first
+      setShowCheckButton(false);
       // Show notification first
       const userName = personalInfo.fullName || booking.userName;
       setNotificationTitle(`${userName} Caregiver`);
@@ -553,6 +555,7 @@ export default function BookingDetailsScreen() {
     setOtherCareDetails('');
 
     // Show orange check mark and notification
+    // Keep the orange check button visible during OTP verification
     setShowCheckButton(true);
     const userName = personalInfo.fullName || booking.userName;
     setNotificationTitle(`${userName} Caregiver`);
@@ -573,11 +576,11 @@ export default function BookingDetailsScreen() {
       }),
     ]).start(() => {
       setNotificationVisible(false);
-      setShowCheckButton(false);
-      // After few seconds, show OTP modal
+      // Keep showCheckButton true - don't hide it
+      // Show OTP modal after notification fades
       setTimeout(() => {
         openOtpModal('complete');
-      }, 2000);
+      }, 500);
     });
   }, [bloodPressureUpper, bloodPressureLower, oxygenLevel, ecgReading, patientHealthInfo, treatmentDetails, otherCareDetails, openOtpModal, personalInfo, booking]);
 
@@ -744,7 +747,7 @@ export default function BookingDetailsScreen() {
                   </View>
                 </View>
               </View>
-            ) : showCheckButton && bookingState === BOOKING_STATES.IN_PROGRESS ? (
+            ) : showCheckButton && (bookingState === BOOKING_STATES.IN_PROGRESS || otpVisible) ? (
               <View style={styles.sliderWrapperInCard}>
                 <View style={[styles.sliderTrack, { backgroundColor: '#FF9800' }]}>
                   <View style={styles.checkButtonContainer}>

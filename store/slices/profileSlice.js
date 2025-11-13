@@ -22,6 +22,7 @@ const initialState = {
   kyc: {
     documents: {}, // keyed by document id
     isApproved: false, // KYC approval status
+    showSuccessModal: false, // Show KYC success modal
   },
   banks: [], // Array of bank accounts
   withdrawals: [], // Array of withdrawal requests
@@ -111,7 +112,15 @@ const profileSlice = createSlice({
       state.profilePictureTaken = action.payload;
     },
     setKycApproved(state, action) {
+      const wasApproved = state.kyc.isApproved;
       state.kyc.isApproved = action.payload;
+      // Show success modal when KYC changes from not approved to approved
+      if (!wasApproved && action.payload) {
+        state.kyc.showSuccessModal = true;
+      }
+    },
+    setKycSuccessModalVisible(state, action) {
+      state.kyc.showSuccessModal = action.payload;
     },
     setBookingState(state, action) {
       const { bookingId, status } = action.payload;
@@ -126,7 +135,7 @@ const profileSlice = createSlice({
   },
 });
 
-export const { setPersonalInfo, upsertKycDocument, removeKycDocument, setMPin, addBankAccount, updateBankAccount, removeBankAccount, addWithdrawal, updateWithdrawalStatus, setLocationPermission, setProfileCompleted, setProfilePictureTaken, setKycApproved, setBookingState, setIncomingBooking, resetProfile } =
+export const { setPersonalInfo, upsertKycDocument, removeKycDocument, setMPin, addBankAccount, updateBankAccount, removeBankAccount, addWithdrawal, updateWithdrawalStatus, setLocationPermission, setProfileCompleted, setProfilePictureTaken, setKycApproved, setKycSuccessModalVisible, setBookingState, setIncomingBooking, resetProfile } =
   profileSlice.actions;
 
 export default profileSlice.reducer;

@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   listItem: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
-    paddingVertical: 16,
+    paddingVertical: 26,
     paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   listItemLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: colors.textPrimary,
   },

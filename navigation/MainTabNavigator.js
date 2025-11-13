@@ -16,10 +16,10 @@ export default function MainTabNavigator({ route }) {
   const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
   const incomingBooking = useSelector((state) => state.profile.incomingBooking);
   const dispatch = useDispatch();
-  const initialRoute = route?.params?.initialRoute || 'Dashboard';
+  const initialRoute = route?.params?.initialRoute || (kycApproved ? 'Dashboard' : 'Profile');
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTranslateY = useRef(new Animated.Value(20)).current;
-  
+
   useEffect(() => {
     if (incomingBooking) {
       Animated.parallel([
@@ -66,11 +66,6 @@ export default function MainTabNavigator({ route }) {
             style={styles.toast}
             onPress={() => {
               dispatch(setIncomingBooking(null));
-              // navigate from root to details
-              // We can't access navigation object here easily; instead, use React Navigation's linking via window.dispatchEvent
-              // The simplest in-app approach: emit an event the app listens to; but shorter: rely on deep link-like name.
-              // We'll navigate via a global ref if available; as a fallback, push to NewBookingDetails from the History tab press later.
-              // Consumers can also programmatically navigate using current navigator by setting route params on DashboardScreen; skipping for brevity.
             }}
           >
             <Text style={styles.toastTitle}>{incomingBooking.title || 'New Booking'}</Text>

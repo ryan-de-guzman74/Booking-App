@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -38,6 +38,7 @@ export default function VerifyAccountScreen() {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const storedKycDocuments = useSelector((state) => state.profile.kyc.documents);
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(KYC_DOCUMENTS[0]);
   const [documentNumber, setDocumentNumber] = useState('');
@@ -45,6 +46,14 @@ export default function VerifyAccountScreen() {
   const [documentSelections, setDocumentSelections] = useState({});
   const [documentNumbers, setDocumentNumbers] = useState({});
   const [focusedInput, setFocusedInput] = useState('type');
+  const approvalTimersRef = useRef({});
+  const isPickingImageRef = useRef(false);
+  const storedKycDocumentsRef = useRef(storedKycDocuments);
+  
+  // Keep ref in sync with current documents
+  useEffect(() => {
+    storedKycDocumentsRef.current = storedKycDocuments;
+  }, [storedKycDocuments]);
 
   const CARD_MIN_HEIGHT = 80;
   const iconSize = CARD_MIN_HEIGHT * 0.4;
@@ -60,16 +69,90 @@ export default function VerifyAccountScreen() {
       return acc;
     }, {});
     setDocumentNumbers(numberMap);
+  }, [storedKycDocuments]);
 
-    // Auto-approve KYC when all 4 documents are uploaded
-    const uploadedDocs = Object.values(storedKycDocuments || {}).filter(
-      (doc) => doc && doc.uri && doc.uri.length > 0,
-    );
-    
-    if (uploadedDocs.length === KYC_DOCUMENTS.length) {
+  // Auto-approve each document 10 seconds after upload, then approve KYC when all are approved
+  useEffect(() => {
+    if (kycApproved) {
+      // Clear all timers if KYC is already approved
+      Object.values(approvalTimersRef.current).forEach((timer) => {
+        if (timer) clearTimeout(timer);
+      });
+      approvalTimersRef.current = {};
+      return;
+    }
+
+    // Check each document and set approval timer if needed
+    KYC_DOCUMENTS.forEach((docDef) => {
+      const doc = storedKycDocuments[docDef.id];
+      const docId = docDef.id.toString();
+      
+      // If document is uploaded but not yet approved
+      if (doc && doc.uri && doc.status !== 'approved') {
+        // If timer already exists, clear it first (document was replaced)
+        if (approvalTimersRef.current[docId]) {
+          clearTimeout(approvalTimersRef.current[docId]);
+        }
+        
+        // Store the document URI when timer starts to ensure we approve the right document
+        const documentUri = doc.uri;
+        const documentId = docDef.id;
+        
+        // Start a new timer for this document
+        approvalTimersRef.current[docId] = setTimeout(() => {
+          // Get the current document state to ensure we're approving the right one
+          const currentDoc = storedKycDocumentsRef.current[documentId];
+          // Only approve if the URI matches (document wasn't replaced) and status is still pending
+          if (currentDoc && currentDoc.uri === documentUri && currentDoc.status !== 'approved') {
+            dispatch(
+              upsertKycDocument({
+                id: documentId,
+                title: docDef.title,
+                number: currentDoc.number || '',
+                fileName: currentDoc.fileName || '',
+                uri: currentDoc.uri,
+                type: currentDoc.type || '',
+                size: currentDoc.size || null,
+                status: 'approved',
+              }),
+            );
+          }
+          // Clear the timer reference
+          delete approvalTimersRef.current[docId];
+        }, 10000);
+      }
+      // If document is already approved, clear any existing timer
+      else if (doc && doc.status === 'approved' && approvalTimersRef.current[docId]) {
+        clearTimeout(approvalTimersRef.current[docId]);
+        delete approvalTimersRef.current[docId];
+      }
+      // If document doesn't exist or has no URI, clear any existing timer
+      else if (!doc || !doc.uri) {
+        if (approvalTimersRef.current[docId]) {
+          clearTimeout(approvalTimersRef.current[docId]);
+          delete approvalTimersRef.current[docId];
+        }
+      }
+    });
+
+    // Check if all documents are approved, then approve KYC
+    const allApproved = KYC_DOCUMENTS.every((docDef) => {
+      const doc = storedKycDocuments[docDef.id];
+      return doc && doc.uri && doc.status === 'approved';
+    });
+
+    if (allApproved && KYC_DOCUMENTS.every((docDef) => storedKycDocuments[docDef.id]?.uri)) {
+      // All documents are approved, approve KYC immediately
       dispatch(setKycApproved(true));
     }
-  }, [storedKycDocuments, dispatch]);
+
+    return () => {
+      // Cleanup is handled by the ref, but we can clear on unmount
+      Object.values(approvalTimersRef.current).forEach((timer) => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, [storedKycDocuments, dispatch, kycApproved]);
 
   const renderIcon = (iconType, iconName) => {
     const iconColor = colors.primary;
@@ -136,10 +219,17 @@ export default function VerifyAccountScreen() {
   const handlePickDocument = async () => {
     if (!selectedDocument) return;
 
+    // Prevent multiple simultaneous calls
+    if (isPickingImageRef.current) {
+      return;
+    }
+
     try {
       if (selectedDocument.title === 'Profile Photo') {
+        isPickingImageRef.current = true;
         const permitted = await requestGalleryPermission();
         if (!permitted) {
+          isPickingImageRef.current = false;
           Alert.alert('Permission needed', 'Please allow photo library access to upload your profile photo.');
           return;
         }
@@ -148,7 +238,10 @@ export default function VerifyAccountScreen() {
           mediaType: 'photo',
           quality: 0.85,
           selectionLimit: 1,
+          includeBase64: false,
         });
+
+        isPickingImageRef.current = false;
 
         if (!result.didCancel && result.assets && result.assets.length > 0) {
           const asset = result.assets[0];
@@ -166,10 +259,13 @@ export default function VerifyAccountScreen() {
           }));
         }
       } else {
+        isPickingImageRef.current = true;
         const file = await DocumentPicker.pickSingle({
           type: DocumentPicker.types.allFiles,
           copyTo: 'cachesDirectory',
         });
+
+        isPickingImageRef.current = false;
 
         setDocumentSelections((prev) => ({
           ...prev,
@@ -186,6 +282,7 @@ export default function VerifyAccountScreen() {
         }));
       }
     } catch (error) {
+      isPickingImageRef.current = false;
       if (isCancel(error)) {
         return;
       }

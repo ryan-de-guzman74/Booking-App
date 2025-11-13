@@ -29,8 +29,8 @@ export default function BottomNav() {
     // Navigate within the tab navigator
     // Since we're using a Tab Navigator, we can navigate directly to screen names
     try {
-      // If KYC not approved, only allow Dashboard (VerifyAccount) and Profile
-      if (!kycApproved && (screenName === 'Bookings' || screenName === 'History')) {
+      // If KYC not approved, only allow Profile (Dashboard shows VerifyAccount but should be disabled)
+      if (!kycApproved && (screenName === 'Dashboard' || screenName === 'Bookings' || screenName === 'History')) {
         return; // Disable navigation
       }
       navigation.navigate(screenName);
@@ -48,16 +48,17 @@ export default function BottomNav() {
         ]}
       >
         <TouchableOpacity
-          style={styles.navItem}
+          style={[styles.navItem, !kycApproved && styles.navItemDisabled]}
           onPress={() => handleNavigation('Dashboard')}
+          disabled={!kycApproved}
         >
           <Ionicons
             name={isDashboard ? 'home' : 'home-outline'}
             size={28}
-            color={isDashboard ? colors.primary : colors.textMuted}
+            color={!kycApproved ? colors.borderMuted : (isDashboard ? colors.primary : colors.textMuted)}
           />
           {!isDashboard ? (
-            <Text style={[styles.navLabel, isDashboard ? styles.navLabelActive : styles.navLabelInactive]}>
+            <Text style={[styles.navLabel, !kycApproved && styles.navLabelDisabled, isDashboard ? styles.navLabelActive : styles.navLabelInactive]}>
               Home
             </Text>
           ) : (

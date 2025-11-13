@@ -2,10 +2,12 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Provider } from 'react-redux';
+import { Provider, useSelector, useDispatch } from 'react-redux';
 import AppNavigator from './navigation/AppNavigator';
 import { store } from './store';
 import ErrorBoundary from './components/ErrorBoundary';
+import KycSuccessModal from './components/KycSuccessModal';
+import { setKycSuccessModalVisible } from './store/slices/profileSlice';
 
 // Add global error handler
 if (!__DEV__) {
@@ -14,6 +16,25 @@ if (!__DEV__) {
     originalError(...args);
     // You can send error reports here
   };
+}
+
+// Inner component that can use hooks
+function AppContent() {
+  const dispatch = useDispatch();
+  const showKycSuccessModal = useSelector((state) => state.profile.kyc.showSuccessModal);
+
+  const handleCloseKycModal = () => {
+    dispatch(setKycSuccessModalVisible(false));
+  };
+
+  return (
+    <>
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+      <KycSuccessModal visible={showKycSuccessModal} onClose={handleCloseKycModal} />
+    </>
+  );
 }
 
 export default function App() {
@@ -25,9 +46,7 @@ export default function App() {
         <Provider store={store}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
-              <NavigationContainer>
-                <AppNavigator />
-              </NavigationContainer>
+              <AppContent />
             </SafeAreaProvider>
           </GestureHandlerRootView>
         </Provider>

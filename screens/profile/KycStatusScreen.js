@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -53,6 +53,7 @@ export default function KycStatusScreen() {
   const navigation = useNavigation();
   const dispatch = useDispatch();
   const storedDocuments = useSelector((state) => state.profile.kyc.documents);
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
 
   const [uploadVisible, setUploadVisible] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(getNextDocument(storedDocuments));
@@ -60,22 +61,111 @@ export default function KycStatusScreen() {
   const [focusedInput, setFocusedInput] = useState('type');
   const [showDocumentTypeList, setShowDocumentTypeList] = useState(false);
   const [draftSelection, setDraftSelection] = useState(null);
+  const approvalTimersRef = useRef({});
+  const isPickingImageRef = useRef(false);
+  const storedDocumentsRef = useRef(storedDocuments);
+
+  // Keep ref in sync with current documents
+  useEffect(() => {
+    storedDocumentsRef.current = storedDocuments;
+  }, [storedDocuments]);
 
   useEffect(() => {
     setSelectedDocument(getNextDocument(storedDocuments));
   }, [storedDocuments]);
 
-  // Auto-approve KYC when all required documents are uploaded here as well
+  // Auto-approve each document 10 seconds after upload, then approve KYC when all are approved
   useEffect(() => {
-    const allProvided = KYC_DOCUMENTS.every((def) => {
-      const rec = storedDocuments[def.id];
-      return rec && !!rec.uri;
+    if (kycApproved) {
+      // Clear all timers if KYC is already approved
+      Object.values(approvalTimersRef.current).forEach((timer) => {
+        if (timer) clearTimeout(timer);
+      });
+      approvalTimersRef.current = {};
+      return;
+    }
+
+    // Check each document and set approval timer if needed
+    KYC_DOCUMENTS.forEach((docDef) => {
+      const doc = storedDocuments[docDef.id];
+      const docId = docDef.id.toString();
+
+      // If document is uploaded but not yet approved
+      if (doc && doc.uri && doc.status !== 'approved') {
+        // If timer already exists, clear it first (document was replaced)
+        if (approvalTimersRef.current[docId]) {
+          clearTimeout(approvalTimersRef.current[docId]);
+        }
+
+        // Store the document URI when timer starts to ensure we approve the right document
+        const documentUri = doc.uri;
+        const documentId = docDef.id;
+
+        // Start a new timer for this document
+        approvalTimersRef.current[docId] = setTimeout(() => {
+          // Get the current document state to ensure we're approving the right one
+          const currentDoc = storedDocumentsRef.current[documentId];
+          // Only approve if the URI matches (document wasn't replaced) and status is still pending
+          if (currentDoc && currentDoc.uri === documentUri && currentDoc.status !== 'approved') {
+            dispatch(
+              upsertKycDocument({
+                id: documentId,
+                title: docDef.title,
+                number: currentDoc.number || '',
+                fileName: currentDoc.fileName || '',
+                uri: currentDoc.uri,
+                type: currentDoc.type || '',
+                size: currentDoc.size || null,
+                status: 'approved',
+              }),
+            );
+          }
+          // Clear the timer reference
+          delete approvalTimersRef.current[docId];
+        }, 4000);
+      }
+      // If document is already approved, clear any existing timer
+      else if (doc && doc.status === 'approved' && approvalTimersRef.current[docId]) {
+        clearTimeout(approvalTimersRef.current[docId]);
+        delete approvalTimersRef.current[docId];
+      }
+      // If document doesn't exist or has no URI, clear any existing timer
+      else if (!doc || !doc.uri) {
+        if (approvalTimersRef.current[docId]) {
+          clearTimeout(approvalTimersRef.current[docId]);
+          delete approvalTimersRef.current[docId];
+        }
+      }
     });
-    dispatch(setKycApproved(allProvided));
-  }, [dispatch, storedDocuments]);
+
+    // Check if all documents are approved, then approve KYC
+    const allApproved = KYC_DOCUMENTS.every((docDef) => {
+      const doc = storedDocuments[docDef.id];
+      return doc && doc.uri && doc.status === 'approved';
+    });
+
+    if (allApproved && KYC_DOCUMENTS.every((docDef) => storedDocuments[docDef.id]?.uri)) {
+      // All documents are approved, approve KYC immediately
+      dispatch(setKycApproved(true));
+    }
+
+    return () => {
+      // Cleanup is handled by the ref, but we can clear on unmount
+      Object.values(approvalTimersRef.current).forEach((timer) => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, [dispatch, storedDocuments, kycApproved]);
 
   const pendingCount = useMemo(() => {
-    return Object.values(storedDocuments || {}).filter((doc) => doc.status !== 'approved').length;
+    // Count approved documents
+    const approvedCount = KYC_DOCUMENTS.filter((docDef) => {
+      const doc = storedDocuments[docDef.id];
+      return doc && doc.uri && doc.status === 'approved';
+    }).length;
+
+    // Remaining documents = 4 - approved count
+    return KYC_DOCUMENTS.length - approvedCount;
   }, [storedDocuments]);
 
   const handleOpenModal = (doc) => {
@@ -120,10 +210,17 @@ export default function KycStatusScreen() {
       return;
     }
 
+    // Prevent multiple simultaneous calls
+    if (isPickingImageRef.current) {
+      return;
+    }
+
     try {
       if (selectedDocument.title === 'Profile Photo') {
+        isPickingImageRef.current = true;
         const permitted = await handleRequestGalleryPermission();
         if (!permitted) {
+          isPickingImageRef.current = false;
           Alert.alert(
             'Permission needed',
             'Please allow photo library access to upload your profile photo.',
@@ -135,7 +232,10 @@ export default function KycStatusScreen() {
           mediaType: 'photo',
           quality: 0.85,
           selectionLimit: 1,
+          includeBase64: false,
         });
+
+        isPickingImageRef.current = false;
 
         if (!result.didCancel && result.assets && result.assets.length > 0) {
           const asset = result.assets[0];
@@ -150,10 +250,13 @@ export default function KycStatusScreen() {
           });
         }
       } else {
+        isPickingImageRef.current = true;
         const file = await DocumentPicker.pickSingle({
           type: DocumentPicker.types.allFiles,
           copyTo: 'cachesDirectory',
         });
+
+        isPickingImageRef.current = false;
 
         setDraftSelection({
           id: selectedDocument.id,
@@ -166,6 +269,7 @@ export default function KycStatusScreen() {
         });
       }
     } catch (error) {
+      isPickingImageRef.current = false;
       if (isCancel(error)) {
         return;
       }
@@ -299,33 +403,33 @@ export default function KycStatusScreen() {
 
       <View style={styles.contentWrapper}>
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.noticeCard}>
-          <MaterialIcons name="info" size={22} color={colors.primaryDark} style={{ marginRight: 8 }} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.noticeText}>
-              Your documents are now submitted for review. Your account will activate upon passing
-              the thorough background checks, immigration status, and screening process.
-            </Text>
-            <Text style={styles.noticeStatus}>
-              {pendingCount === 0
-                ? 'All documents approved'
-                : `${pendingCount} verification${pendingCount > 1 ? 's' : ''} remaining`}
-            </Text>
+          <View style={styles.noticeCard}>
+            <MaterialIcons name="info" size={22} color={colors.primaryDark} style={{ marginRight: 8 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.noticeText}>
+                Your documents are now submitted for review. Your account will activate upon passing
+                the thorough background checks, immigration status, and screening process.
+              </Text>
+              <Text style={styles.noticeStatus}>
+                {pendingCount === 0 && storedDocsArray.length === KYC_DOCUMENTS.length
+                  ? 'All documents approved'
+                  : `${pendingCount} verification${pendingCount > 1 ? 's' : ''} remaining`}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        {storedDocsArray.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialIcons name="folder-open" size={48} color="#FFFFFF" />
-            <Text style={styles.emptyTitle}>No documents submitted</Text>
-            <Text style={styles.emptySubtitle}>
-              Tap the add button below to upload your first verification document.
-            </Text>
-          </View>
-        ) : (
-          storedDocsArray.map(renderDocumentCard)
-        )}
-      </ScrollView>
+          {storedDocsArray.length === 0 ? (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="folder-open" size={48} color="#FFFFFF" />
+              <Text style={styles.emptyTitle}>No documents submitted</Text>
+              <Text style={styles.emptySubtitle}>
+                Tap the add button below to upload your first verification document.
+              </Text>
+            </View>
+          ) : (
+            storedDocsArray.map(renderDocumentCard)
+          )}
+        </ScrollView>
       </View>
 
       <TouchableOpacity
@@ -470,9 +574,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  safeArea: {
-    flex: 0,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -480,6 +581,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     paddingBottom: 16,
+    marginVertical: 20,
   },
   backButton: {
     width: 36,

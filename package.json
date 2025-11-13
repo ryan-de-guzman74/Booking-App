@@ -11,6 +11,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@react-native-community/image-editor": "^4.3.0",
     "@react-native-masked-view/masked-view": "^0.3.1",
     "@react-native-ml-kit/face-detection": "^2.0.1",
     "@react-navigation/bottom-tabs": "^7.8.1",
@@ -29,6 +30,7 @@
     "react-native-vector-icons": "^10.1.0",
     "react-native-vision-camera": "^4.7.2",
     "react-native-vision-camera-face-detector": "^1.9.1",
+    "react-native-worklets-core": "^1.6.2",
     "react-redux": "^9.1.2"
   },
   "devDependencies": {
