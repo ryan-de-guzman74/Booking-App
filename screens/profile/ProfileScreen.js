@@ -47,41 +47,13 @@ export default function ProfileScreen() {
   };
 
   const handleChangePhoto = async () => {
-    try {
-      if (Platform.OS === 'android') {
-        const hasPermission = await requestPhotoPermission();
-        if (!hasPermission) {
-          Alert.alert(
-            'Permission needed',
-            'Please allow photo library access to update your profile photo.',
-          );
-          return;
-        }
-      }
-
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        quality: 0.85,
-        selectionLimit: 1,
-      });
-
-      if (!result.didCancel && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        dispatch(
-          setPersonalInfo({
-            avatar: asset.uri,
-          }),
-        );
-      }
-    } catch (error) {
-      console.error('Profile photo selection error', error);
-      Alert.alert('Update failed', 'Unable to change profile photo. Please try again.');
-    }
+    // Navigate to ProfilePictureTakenScreen
+    navigation.navigate('ProfilePictureTaken');
   };
 
   const handleCameraIconPress = () => {
-    // Navigate to camera screen for taking photo
-    navigation.navigate('FaceCaptureCamera', { source: 'profile' });
+    // Navigate to ProfilePictureTakenScreen
+    navigation.navigate('ProfilePictureTaken');
   };
 
     return (
