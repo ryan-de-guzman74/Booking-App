@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   NativeModules,
+  BackHandler,
 } from 'react-native';
 import { Camera, useCameraDevice, useCameraPermission } from 'react-native-vision-camera';
 import ImageEditor from '@react-native-community/image-editor';
@@ -19,6 +20,7 @@ import FaceDetection from '@react-native-ml-kit/face-detection';
 import DeviceInfo from 'react-native-device-info';
 import RNFS from 'react-native-fs';
 import { Image } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 
 const { AssetFileModule } = NativeModules;
 
@@ -56,6 +58,20 @@ export default function FaceCaptureCameraScreen({ navigation }) {
   const faceAreaCenterX = screenWidth / 2;
   const faceAreaCenterY = FACE_AREA_CENTER_Y;
   const faceAreaRadius = FACE_AREA_SIZE / 2;
+
+  // Handle back button press - navigate back to ProfilePictureTakenScreen
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        navigation.navigate('ProfilePictureTaken');
+        return true; // Prevent default back behavior
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => backHandler.remove();
+    }, [navigation])
+  );
+
   useEffect(() => {
     const checkEmulator = async () => {
       const emulator = await DeviceInfo.isEmulator();
@@ -425,35 +441,44 @@ export default function FaceCaptureCameraScreen({ navigation }) {
         const snapshotHeight = photoForDetection.height || screenHeight;
 
         // Map all detected faces to screen coordinates for visualization
-        const visualizations = faces.map((face) => {
-          const faceCenterXImage =
-            photoForDetection.isMirrored
-              ? snapshotWidth - (face.frame.left + face.frame.width / 2)
-              : face.frame.left + face.frame.width / 2;
-          const faceCenterYImage = face.frame.top + face.frame.height / 2;
+        // Only show faces that are inside the green circle
+        const visualizations = faces
+          .map((face) => {
+            const faceCenterXImage =
+              photoForDetection.isMirrored
+                ? snapshotWidth - (face.frame.left + face.frame.width / 2)
+                : face.frame.left + face.frame.width / 2;
+            const faceCenterYImage = face.frame.top + face.frame.height / 2;
 
-          const centerXOnScreen =
-            (faceCenterXImage / snapshotWidth) * screenWidth;
-          const centerYOnScreen =
-            (faceCenterYImage / snapshotHeight) * screenHeight;
+            const centerXOnScreen =
+              (faceCenterXImage / snapshotWidth) * screenWidth;
+            const centerYOnScreen =
+              (faceCenterYImage / snapshotHeight) * screenHeight;
 
-          // Map face bounds to screen coordinates
-          const leftOnScreen = photoForDetection.isMirrored
-            ? screenWidth - ((face.frame.left + face.frame.width) / snapshotWidth) * screenWidth
-            : (face.frame.left / snapshotWidth) * screenWidth;
-          const topOnScreen = (face.frame.top / snapshotHeight) * screenHeight;
-          const widthOnScreen = (face.frame.width / snapshotWidth) * screenWidth;
-          const heightOnScreen = (face.frame.height / snapshotHeight) * screenHeight;
+            // Map face bounds to screen coordinates
+            const leftOnScreen = photoForDetection.isMirrored
+              ? screenWidth - ((face.frame.left + face.frame.width) / snapshotWidth) * screenWidth
+              : (face.frame.left / snapshotWidth) * screenWidth;
+            const topOnScreen = (face.frame.top / snapshotHeight) * screenHeight;
+            const widthOnScreen = (face.frame.width / snapshotWidth) * screenWidth;
+            const heightOnScreen = (face.frame.height / snapshotHeight) * screenHeight;
 
-          return {
-            left: leftOnScreen,
-            top: topOnScreen,
-            width: widthOnScreen,
-            height: heightOnScreen,
-            centerX: centerXOnScreen,
-            centerY: centerYOnScreen,
-          };
-        });
+            return {
+              left: leftOnScreen,
+              top: topOnScreen,
+              width: widthOnScreen,
+              height: heightOnScreen,
+              centerX: centerXOnScreen,
+              centerY: centerYOnScreen,
+            };
+          })
+          .filter((vis) => {
+            // Only show visualizations for faces inside the green circle
+            const dx = vis.centerX - faceAreaCenterX;
+            const dy = vis.centerY - faceAreaCenterY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            return distance <= faceAreaRadius * 0.8;
+          });
 
         setFaceVisualizations(visualizations);
 
@@ -615,28 +640,37 @@ export default function FaceCaptureCameraScreen({ navigation }) {
             }
 
             // Map all detected faces to screen coordinates for visualization
-            const visualizations = faces.map((face) => {
-              const faceCenterXImage = face.frame.left + face.frame.width / 2;
-              const faceCenterYImage = face.frame.top + face.frame.height / 2;
-              
-              const centerXOnScreen = faceCenterXImage * scaleX + offsetX;
-              const centerYOnScreen = faceCenterYImage * scaleY + offsetY;
+            // Only show faces that are inside the green circle
+            const visualizations = faces
+              .map((face) => {
+                const faceCenterXImage = face.frame.left + face.frame.width / 2;
+                const faceCenterYImage = face.frame.top + face.frame.height / 2;
+                
+                const centerXOnScreen = faceCenterXImage * scaleX + offsetX;
+                const centerYOnScreen = faceCenterYImage * scaleY + offsetY;
 
-              // Map face bounds to screen coordinates
-              const leftOnScreen = face.frame.left * scaleX + offsetX;
-              const topOnScreen = face.frame.top * scaleY + offsetY;
-              const widthOnScreen = face.frame.width * scaleX;
-              const heightOnScreen = face.frame.height * scaleY;
+                // Map face bounds to screen coordinates
+                const leftOnScreen = face.frame.left * scaleX + offsetX;
+                const topOnScreen = face.frame.top * scaleY + offsetY;
+                const widthOnScreen = face.frame.width * scaleX;
+                const heightOnScreen = face.frame.height * scaleY;
 
-              return {
-                left: leftOnScreen,
-                top: topOnScreen,
-                width: widthOnScreen,
-                height: heightOnScreen,
-                centerX: centerXOnScreen,
-                centerY: centerYOnScreen,
-              };
-            });
+                return {
+                  left: leftOnScreen,
+                  top: topOnScreen,
+                  width: widthOnScreen,
+                  height: heightOnScreen,
+                  centerX: centerXOnScreen,
+                  centerY: centerYOnScreen,
+                };
+              })
+              .filter((vis) => {
+                // Only show visualizations for faces inside the green circle
+                const dx = vis.centerX - faceAreaCenterX;
+                const dy = vis.centerY - faceAreaCenterY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                return distance <= faceAreaRadius * 0.8;
+              });
 
             setFaceVisualizations(visualizations);
 
@@ -809,7 +843,7 @@ export default function FaceCaptureCameraScreen({ navigation }) {
               {isCapturing
                 ? 'Capturing...'
                 : faceDetected
-                  ? 'Face Detected! Keep this for a few seconds...'
+                  ? 'Please keep your camera stable for a few seconds.'
                   : 'Position your face inside the circle'}
             </Text>
           </View>
@@ -928,7 +962,7 @@ export default function FaceCaptureCameraScreen({ navigation }) {
             {isCapturing
               ? 'Capturing...'
               : faceDetected
-                ? 'Face Detected! Keep this for a few seconds...'
+                ? 'Please keep your camera stable for a few seconds.'
                 : 'Position your face inside the circle'}
           </Text>
         </View>

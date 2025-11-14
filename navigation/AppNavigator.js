@@ -32,7 +32,7 @@ const Stack = createNativeStackNavigator();
 export default function AppNavigator() {
   return (
     <Stack.Navigator
-      initialRouteName="FaceCaptureCamera"
+      initialRouteName="GetStarted"
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',

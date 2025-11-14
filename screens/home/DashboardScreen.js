@@ -8,13 +8,14 @@ import {
   Dimensions,
   StatusBar,
   Platform,
+  BackHandler,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FontAwesome5 from 'react-native-vector-icons/FontAwesome5';
 import { useSelector } from 'react-redux';
 import BottomNav from '../../components/BottomNav';
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useFocusEffect } from '@react-navigation/native';
 import { Animated } from 'react-native';
 import { colors, getGradientColors, getGradientLocations } from '../../theme/colors';
 
@@ -27,11 +28,29 @@ export default function DashboardScreen() {
   const personalInfo = useSelector((state) => state.profile.personalInfo);
   const profileName = personalInfo.fullName || 'Caretaker Snah';
   const avatarUri = personalInfo.avatar;
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
   const [isPowerOn, setIsPowerOn] = useState(false);
   const route = useRoute();
   const showAcceptToast = route?.params?.acceptedToast;
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTranslateY = useRef(new Animated.Value(20)).current;
+
+  // Handle back button press - exit app when KYC approved
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (kycApproved) {
+          // If KYC approved, exit the app
+          BackHandler.exitApp();
+          return true; // Prevent default back behavior
+        }
+        return false; // Allow default back behavior if KYC not approved
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => backHandler.remove();
+    }, [kycApproved])
+  );
 
   useEffect(() => {
     if (showAcceptToast) {

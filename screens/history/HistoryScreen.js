@@ -1,7 +1,7 @@
 import React from 'react';
-import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View, BackHandler } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import BottomNav from '../../components/BottomNav';
@@ -156,6 +156,24 @@ const parseDateForSort = (dateString) => {
 export default function HistoryScreen() {
   const navigation = useNavigation();
   const bookingStates = useSelector((state) => state.profile.bookingStates || {});
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
+
+  // Handle back button press
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (kycApproved) {
+          // If KYC approved, navigate to Dashboard (HomeScreen)
+          navigation.navigate('MainApp', { screen: 'Dashboard' });
+          return true; // Prevent default back behavior
+        }
+        return false; // Allow default back behavior if KYC not approved
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => backHandler.remove();
+    }, [navigation, kycApproved])
+  );
   
   // Include confirmed bookings from BookingsScreen (those with booking states)
   const confirmedBookings = Object.keys(bookingStates).map((bookingId) => {

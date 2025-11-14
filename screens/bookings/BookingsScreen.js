@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
   Dimensions,
   ScrollView,
+  BackHandler,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Ionicons from 'react-native-vector-icons/Ionicons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { getGradientColors, getGradientLocations, colors } from '../../theme/colors';
 import BottomNav from '../../components/BottomNav';
@@ -65,6 +66,24 @@ const parseDateForSort = (dateString) => {
 export default function BookingsScreen() {
   const navigation = useNavigation();
   const bookingStates = useSelector((state) => state.profile.bookingStates || {});
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
+
+  // Handle back button press
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (kycApproved) {
+          // If KYC approved, navigate to Dashboard (HomeScreen)
+          navigation.navigate('MainApp', { screen: 'Dashboard' });
+          return true; // Prevent default back behavior
+        }
+        return false; // Allow default back behavior if KYC not approved
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => backHandler.remove();
+    }, [navigation, kycApproved])
+  );
 
   // Filter to only new/unconfirmed bookings by absence in stored states, sorted by date (latest first)
   const incomingBookings = BOOKINGS.filter((b) => !bookingStates[b.id])

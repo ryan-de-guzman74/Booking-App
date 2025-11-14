@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -10,11 +10,12 @@ import {
   Alert,
   Platform,
   PermissionsAndroid,
+  BackHandler,
 } from 'react-native';
 import { StatusBar } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { colors, getGradientColors, getGradientLocations } from '../../theme/colors';
 import BottomNav from '../../components/BottomNav';
@@ -29,8 +30,29 @@ export default function ProfileScreen() {
   const dispatch = useDispatch();
   const personalInfo = useSelector((state) => state.profile.personalInfo);
   const storedMPin = useSelector((state) => state.profile.personalInfo.mPin);
+  const kycApproved = useSelector((state) => state.profile.kyc.isApproved);
   const profileName = personalInfo.fullName || 'Guest User';
   const avatarUri = personalInfo.avatar;
+
+  // Handle back button press
+  useFocusEffect(
+    React.useCallback(() => {
+      const onBackPress = () => {
+        if (kycApproved) {
+          // If KYC approved, navigate to Dashboard (HomeScreen)
+          navigation.navigate('MainApp', { screen: 'Dashboard' });
+          return true; // Prevent default back behavior
+        } else {
+          // If KYC not approved, prevent going back to VerifyAccountScreen
+          // Just stay on ProfileScreen
+          return true; // Prevent default back behavior
+        }
+      };
+
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => backHandler.remove();
+    }, [navigation, kycApproved])
+  );
 
   const requestPhotoPermission = async () => {
     if (Platform.OS !== 'android') return true;
